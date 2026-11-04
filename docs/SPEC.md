@@ -162,6 +162,14 @@ tiny enemies, the target is roughly **60–150 active enemies** on screen, weigh
 **Solar map** (one system to start, about 5 planets) → **Planet** → **Tactical map**: the planet surface is split into
 **zones** (hex grid or Voronoi regions, about 20 to 40 per planet), each owned by the Alliance or a faction.
 
+**Missions happen on the planet's surface (Andre, v0.3):**
+- The tactical map is the **3D planet globe** with the zones laid across its whole surface, coloured by owner. The player rotates the
+  globe to pick a zone.
+- Selecting a zone and starting the mission plays a **descent transition**: the camera dives from orbit through the clouds down to
+  that zone's location, and the battlecruiser arrives low over the surface.
+- The mission then plays **over that zone's own patch of ground**, so each zone looks different (see §5.2). After the mission the
+  camera climbs back to orbit and the zone's new colour/Control is shown on the globe.
+
 **First prototype planets (Andre, v0.3):**
 - **Megacity planet\***: almost the whole surface is one endless metropolis. Mission backdrop: skyscrapers, lit streets and traffic far below,
   fires and smoke where the city is under attack.
@@ -221,9 +229,12 @@ Not in the first version. The design keeps it possible:
   or when the screen gets crowded.
 - Screen shake on big hits (with a toggle in settings).
 
-### 5.2 The planet below
-- Layered backdrop under the play plane: **planet surface** (large tiled/streamed ground mesh or textured plane per biome)
-  → **cloud layer** (scrolling, semi‑transparent) → play plane with ships.
+### 5.2 The planet surface (where missions take place)
+- The battle happens **low over the surface of the selected zone**: ground (city blocks or ocean) → optional thin haze/low clouds
+  → play plane with ships.
+- **Each zone has its own terrain variant** generated from its zone ID (seed), so neighbouring zones feel like different places on the
+  same planet. Megacity examples: downtown towers, industrial district, spaceport, burning frontline. Ocean examples: open sea,
+  island chain, platform field, wreck graveyard.
 - Scrolls slowly with parallax as the ship moves, which sells altitude and scale.
 - Biome set dressing: city (burning buildings, flak tracers), jungle (canopy, mist), ocean (animated water, naval wrecks).
 - This is purely visual; it never collides, so it can be cheap (low‑poly, baked lighting).
