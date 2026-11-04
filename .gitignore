@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Downloaded source packs for the asset pipeline (see assets/ASSETS.md); only optimized output is committed.
+assets/source/

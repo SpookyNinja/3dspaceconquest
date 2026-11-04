@@ -1,0 +1,456 @@
+{
+  "ships": [
+    {
+      "id": "player_battlecruiser",
+      "file": "models/ships/player_battlecruiser.glb",
+      "role": "player",
+      "source": "Imperial",
+      "colour": "Blue",
+      "size": [
+        7.73,
+        3.3,
+        18.55
+      ]
+    },
+    {
+      "id": "enemy_cruiser",
+      "file": "models/ships/enemy_cruiser.glb",
+      "role": "boss",
+      "source": "Imperial",
+      "colour": "Red",
+      "size": [
+        7.73,
+        3.3,
+        18.55
+      ]
+    },
+    {
+      "id": "enemy_fighter_striker",
+      "file": "models/ships/enemy_fighter_striker.glb",
+      "role": "fighter",
+      "source": "Striker",
+      "colour": "Red",
+      "size": [
+        5.03,
+        2.68,
+        8.43
+      ]
+    },
+    {
+      "id": "enemy_fighter_dispatcher",
+      "file": "models/ships/enemy_fighter_dispatcher.glb",
+      "role": "fighter",
+      "source": "Dispatcher",
+      "colour": "Red",
+      "size": [
+        4.9,
+        3.09,
+        10.26
+      ]
+    },
+    {
+      "id": "enemy_fighter_insurgent",
+      "file": "models/ships/enemy_fighter_insurgent.glb",
+      "role": "fighter",
+      "source": "Insurgent",
+      "colour": "Red",
+      "size": [
+        5.57,
+        2.87,
+        10.95
+      ]
+    },
+    {
+      "id": "enemy_fighter_spitfire",
+      "file": "models/ships/enemy_fighter_spitfire.glb",
+      "role": "fighter",
+      "source": "Spitfire",
+      "colour": "Red",
+      "size": [
+        10.52,
+        3.06,
+        7.53
+      ]
+    },
+    {
+      "id": "enemy_fighter_zenith",
+      "file": "models/ships/enemy_fighter_zenith.glb",
+      "role": "fighter",
+      "source": "Zenith",
+      "colour": "Red",
+      "size": [
+        5.63,
+        5.43,
+        12.07
+      ]
+    },
+    {
+      "id": "enemy_bomber_bob",
+      "file": "models/ships/enemy_bomber_bob.glb",
+      "role": "heavy",
+      "source": "Bob",
+      "colour": "Red",
+      "size": [
+        10.5,
+        2.04,
+        5.61
+      ]
+    },
+    {
+      "id": "enemy_gunship_challenger",
+      "file": "models/ships/enemy_gunship_challenger.glb",
+      "role": "heavy",
+      "source": "Challenger",
+      "colour": "Red",
+      "size": [
+        10.5,
+        3.02,
+        10.18
+      ]
+    },
+    {
+      "id": "enemy_gunship_executioner",
+      "file": "models/ships/enemy_gunship_executioner.glb",
+      "role": "heavy",
+      "source": "Executioner",
+      "colour": "Red",
+      "size": [
+        10.02,
+        1.85,
+        9.2
+      ]
+    },
+    {
+      "id": "enemy_frigate_omen",
+      "file": "models/ships/enemy_frigate_omen.glb",
+      "role": "heavy",
+      "source": "Omen",
+      "colour": "Red",
+      "size": [
+        12.78,
+        3.14,
+        12.58
+      ]
+    },
+    {
+      "id": "enemy_frigate_pancake",
+      "file": "models/ships/enemy_frigate_pancake.glb",
+      "role": "heavy",
+      "source": "Pancake",
+      "colour": "Red",
+      "size": [
+        10.5,
+        2.6,
+        8.23
+      ]
+    }
+  ],
+  "props": [
+    {
+      "id": "meteorFull",
+      "file": "models/props/meteorFull.glb"
+    },
+    {
+      "id": "meteorFullRound",
+      "file": "models/props/meteorFullRound.glb"
+    },
+    {
+      "id": "meteorHalf",
+      "file": "models/props/meteorHalf.glb"
+    },
+    {
+      "id": "rocks",
+      "file": "models/props/rocks.glb"
+    },
+    {
+      "id": "rocksOre",
+      "file": "models/props/rocksOre.glb"
+    },
+    {
+      "id": "rocksTall",
+      "file": "models/props/rocksTall.glb"
+    },
+    {
+      "id": "rocksSmallOre",
+      "file": "models/props/rocksSmallOre.glb"
+    },
+    {
+      "id": "crater",
+      "file": "models/props/crater.glb"
+    },
+    {
+      "id": "craterLarge",
+      "file": "models/props/craterLarge.glb"
+    },
+    {
+      "id": "station",
+      "file": "models/props/station.glb"
+    },
+    {
+      "id": "stationLarge",
+      "file": "models/props/stationLarge.glb"
+    },
+    {
+      "id": "satelliteDish",
+      "file": "models/props/satelliteDish.glb"
+    },
+    {
+      "id": "satelliteDishLarge",
+      "file": "models/props/satelliteDishLarge.glb"
+    },
+    {
+      "id": "satelliteDishAntenna",
+      "file": "models/props/satelliteDishAntenna.glb"
+    },
+    {
+      "id": "portal",
+      "file": "models/props/portal.glb"
+    },
+    {
+      "id": "barrel",
+      "file": "models/props/barrel.glb"
+    },
+    {
+      "id": "barrelLarge",
+      "file": "models/props/barrelLarge.glb"
+    },
+    {
+      "id": "spaceCraft1",
+      "file": "models/props/spaceCraft1.glb"
+    },
+    {
+      "id": "spaceCraft2",
+      "file": "models/props/spaceCraft2.glb"
+    },
+    {
+      "id": "spaceCraft3",
+      "file": "models/props/spaceCraft3.glb"
+    },
+    {
+      "id": "spaceCraft4",
+      "file": "models/props/spaceCraft4.glb"
+    },
+    {
+      "id": "spaceCraft5",
+      "file": "models/props/spaceCraft5.glb"
+    },
+    {
+      "id": "spaceCraft6",
+      "file": "models/props/spaceCraft6.glb"
+    }
+  ],
+  "sprites": [
+    {
+      "id": "circle_05",
+      "file": "sprites/particles/circle_05.png"
+    },
+    {
+      "id": "fire_01",
+      "file": "sprites/particles/fire_01.png"
+    },
+    {
+      "id": "fire_02",
+      "file": "sprites/particles/fire_02.png"
+    },
+    {
+      "id": "flame_03",
+      "file": "sprites/particles/flame_03.png"
+    },
+    {
+      "id": "flame_05",
+      "file": "sprites/particles/flame_05.png"
+    },
+    {
+      "id": "flare_01",
+      "file": "sprites/particles/flare_01.png"
+    },
+    {
+      "id": "light_01",
+      "file": "sprites/particles/light_01.png"
+    },
+    {
+      "id": "light_03",
+      "file": "sprites/particles/light_03.png"
+    },
+    {
+      "id": "magic_02",
+      "file": "sprites/particles/magic_02.png"
+    },
+    {
+      "id": "muzzle_01",
+      "file": "sprites/particles/muzzle_01.png"
+    },
+    {
+      "id": "muzzle_02",
+      "file": "sprites/particles/muzzle_02.png"
+    },
+    {
+      "id": "muzzle_04",
+      "file": "sprites/particles/muzzle_04.png"
+    },
+    {
+      "id": "scorch_02",
+      "file": "sprites/particles/scorch_02.png"
+    },
+    {
+      "id": "smoke_01",
+      "file": "sprites/particles/smoke_01.png"
+    },
+    {
+      "id": "smoke_04",
+      "file": "sprites/particles/smoke_04.png"
+    },
+    {
+      "id": "smoke_07",
+      "file": "sprites/particles/smoke_07.png"
+    },
+    {
+      "id": "spark_01",
+      "file": "sprites/particles/spark_01.png"
+    },
+    {
+      "id": "spark_04",
+      "file": "sprites/particles/spark_04.png"
+    },
+    {
+      "id": "spark_06",
+      "file": "sprites/particles/spark_06.png"
+    },
+    {
+      "id": "star_04",
+      "file": "sprites/particles/star_04.png"
+    },
+    {
+      "id": "star_07",
+      "file": "sprites/particles/star_07.png"
+    },
+    {
+      "id": "trace_01",
+      "file": "sprites/particles/trace_01.png"
+    },
+    {
+      "id": "trace_04",
+      "file": "sprites/particles/trace_04.png"
+    },
+    {
+      "id": "twirl_02",
+      "file": "sprites/particles/twirl_02.png"
+    }
+  ],
+  "sounds": [
+    {
+      "id": "laser_small_000",
+      "file": "audio/sfx/laser_small_000.ogg"
+    },
+    {
+      "id": "laser_small_002",
+      "file": "audio/sfx/laser_small_002.ogg"
+    },
+    {
+      "id": "laser_large_000",
+      "file": "audio/sfx/laser_large_000.ogg"
+    },
+    {
+      "id": "laser_large_002",
+      "file": "audio/sfx/laser_large_002.ogg"
+    },
+    {
+      "id": "laser_retro_001",
+      "file": "audio/sfx/laser_retro_001.ogg"
+    },
+    {
+      "id": "explosion_crunch_000",
+      "file": "audio/sfx/explosion_crunch_000.ogg"
+    },
+    {
+      "id": "explosion_crunch_002",
+      "file": "audio/sfx/explosion_crunch_002.ogg"
+    },
+    {
+      "id": "low_frequency_explosion_000",
+      "file": "audio/sfx/low_frequency_explosion_000.ogg"
+    },
+    {
+      "id": "low_frequency_explosion_001",
+      "file": "audio/sfx/low_frequency_explosion_001.ogg"
+    },
+    {
+      "id": "impact_metal_000",
+      "file": "audio/sfx/impact_metal_000.ogg"
+    },
+    {
+      "id": "impact_metal_002",
+      "file": "audio/sfx/impact_metal_002.ogg"
+    },
+    {
+      "id": "force_field_000",
+      "file": "audio/sfx/force_field_000.ogg"
+    },
+    {
+      "id": "force_field_002",
+      "file": "audio/sfx/force_field_002.ogg"
+    },
+    {
+      "id": "thruster_fire_000",
+      "file": "audio/sfx/thruster_fire_000.ogg"
+    },
+    {
+      "id": "space_engine_large_000",
+      "file": "audio/sfx/space_engine_large_000.ogg"
+    },
+    {
+      "id": "space_engine_low_000",
+      "file": "audio/sfx/space_engine_low_000.ogg"
+    },
+    {
+      "id": "computer_noise_000",
+      "file": "audio/sfx/computer_noise_000.ogg"
+    },
+    {
+      "id": "door_open_000",
+      "file": "audio/sfx/door_open_000.ogg"
+    }
+  ],
+  "textures": [
+    {
+      "id": "stars_milky_way_4k",
+      "file": "textures/sky/stars_milky_way_4k.jpg"
+    },
+    {
+      "id": "sun_2k",
+      "file": "textures/planets/sun_2k.jpg"
+    },
+    {
+      "id": "clouds_2k",
+      "file": "textures/planets/clouds_2k.jpg"
+    },
+    {
+      "id": "moon_2k",
+      "file": "textures/planets/moon_2k.jpg"
+    },
+    {
+      "id": "facade018a_color",
+      "file": "textures/surface/city/facade018a_color.jpg"
+    },
+    {
+      "id": "facade018a_emission",
+      "file": "textures/surface/city/facade018a_emission.jpg"
+    },
+    {
+      "id": "facade018a_normal",
+      "file": "textures/surface/city/facade018a_normal.jpg"
+    },
+    {
+      "id": "facade006_color",
+      "file": "textures/surface/city/facade006_color.jpg"
+    },
+    {
+      "id": "facade006_normal",
+      "file": "textures/surface/city/facade006_normal.jpg"
+    },
+    {
+      "id": "foam003_color",
+      "file": "textures/surface/ocean/foam003_color.jpg"
+    }
+  ]
+}
