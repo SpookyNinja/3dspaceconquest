@@ -188,7 +188,7 @@ async function showFleet() {
       e.node.rotation.y = -a; // tangent to the circle; ship noses point along +Z after glTF import
     }
   });
-  camera.setTarget(BABYLON.Vector3.Zero()); camera.alpha = -Math.PI / 3; camera.beta = 1.0; camera.radius = 200;
+  camera.setTarget(BABYLON.Vector3.Zero()); camera.alpha = -Math.PI / 2 - 0.35; camera.beta = 0.6; camera.radius = 200; // ~56° pitch, slight yaw offset (SPEC §5.1)
   info(`Player: Imperial hull x${PLAYER_SCALE} (~${(18.55 * PLAYER_SCALE).toFixed(0)} units long)\nEnemies: ${fighters.length} fighter types, ${heavies.length} heavier types (~5-13 units)`);
 }
 
