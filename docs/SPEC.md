@@ -1,8 +1,14 @@
 # Space Conquest* — Game Plan & Design Spec
 
-> Status: **Draft v0.1** (2026-11-04). Names marked with `*` are placeholders.
+> Status: **Draft v0.2** (2026-11-04). Names marked with `*` are placeholders.
 > Every open choice is tagged **[D#]** and collected in [§10 Decisions for Andre](#10-decisions-for-andre).
 > Each one has a recommendation, so we can start building on the defaults and change course later.
+>
+> **v0.2 decisions by Andre:**
+> - The game is **offline / single‑player first**. Accounts, cloud saves and the shared online map are **later** and are kept in mind in the architecture only (§4.5, §6.4–6.6).
+> - Factions **push back passively** using a hidden counter‑attack meter (§4.4).
+> - **Fewer but tougher enemies** that still feel like an armada (§3.5, §7.2).
+> - The game is **free to play**.
 
 ---
 
@@ -11,13 +17,13 @@
 A browser‑playable 3D co‑op roguelite. Players join **the Alliance\*** and command huge, slow battleships
 in short Vampire‑Survivors‑style missions. Their auto‑firing weapons shred swarms of enemies while the
 player steers to dodge and to collect resources. Every mission, won or lost, pays **credits** for permanent
-upgrades. Missions are fought over **zones on planets**, and all online players share one galaxy map:
-together they push the Alliance front line into enemy faction territory.
+upgrades. Missions are fought over **zones on planets**, and the player pushes the Alliance front line
+into enemy faction territory while the factions push back. *Later:* all online players share one galaxy map.
 
 **Pillars**
 1. **Feel like a capital ship.** You have weight, momentum and broadsides. You are not a nimble fighter.
 2. **One more run.** Runs of 10 to 15 minutes, with a level‑up choice every 30 to 60 seconds and a credit payout every time.
-3. **We're winning the war together.** Your run visibly moves a shared front line.
+3. **We're winning the war.** Your run visibly moves the front line (shared with other players later).
 
 ---
 
@@ -38,7 +44,7 @@ together they push the Alliance front line into enemy faction territory.
  │  └────────────────────────────────────────────┘  │
  │        │ result (win/lose, time, kills, loot)    │
  │        ▼                                         │
- │  Credits + zone contribution → server            │
+ │  Credits + zone progress → local save            │
  └──────────────────────────────────────────────────┘
 ```
 
@@ -96,6 +102,15 @@ which creates the "maneuver to gather" tension you described.
 - Archetypes: chaser, shooter, tank, splitter, kamikaze, elite (drops salvage), mini‑boss, boss.
 - **Difficulty knobs** per zone tier: spawn rate, enemy HP/damage multipliers, elite chance, boss modifiers.
 
+**Fewer, tougher enemies that still feel like an armada (v0.2).** Rather than Vampire Survivors' thousands of
+tiny enemies, the target is roughly **60–150 active enemies** on screen, weighted toward bigger, tougher types. The "armada" feeling comes from:
+- **Formations and squadrons:** enemies arrive as wings in V‑shapes and lines, not as random dots, so 12 ships read as one fleet.
+- **Size tiers:** fighters (swarm, die in one hit) → frigates → cruisers → capital ships with multiple destroyable hardpoints.
+- **Carriers that launch fighters** keep the screen busy cheaply.
+- **Background fleet:** non‑interactive enemy and Alliance capital ships fighting far below and around the play area (cheap, low detail, never collide).
+- **Warp‑in effects and big wave announcements** ("Enemy battle group inbound").
+- **Bullet‑hell‑lite:** enemy projectiles and missiles add density without adding enemy count.
+
 ### 3.6 Meta progression (credits)
 - Credits = f(time survived, kills, win bonus, salvage, zone tier multiplier).
 - **Spend on:** permanent stat upgrades (small, many tiers), new ships, extra hardpoint slots, starting weapon choice,
@@ -118,25 +133,41 @@ dominant enemy faction.
 - **Depth** = distance in zones from the original Alliance foothold, or from the nearest Alliance‑held border. Deeper means a
   higher **difficulty tier** and better credit multiplier. This matches your "the further we push, the harder it gets".
 
-### 4.3 Capture rule (proposal) [D4]
+### 4.3 Capture rule (offline version) [D4]
 Each zone has **Control** from 0 to 100% for the Alliance.
-- A run in a zone that reaches the milestone adds **contribution points** (more for a win, more for deeper tiers).
+- A run in a zone that reaches the milestone adds Control (proposal: +35% for a win, +20% for reaching the milestone, less for an early loss).
+  So a zone takes about 3 good runs.
 - The zone flips when Control hits 100%. Neighbouring zones become attackable.
-- **Per‑player cap per zone per day**, so one player (or one cheater) can't capture alone. This keeps it genuinely co‑op.
-- **Threshold scales with active players.** This is important: with 5 players online a fixed "100 players needed"
-  stalls forever, and with 5,000 the map is done in an hour. Threshold ≈ `base × clamp(active_players_24h / target, min, max)`.
+- Control is the "how far the player has pushed into the zone" value that drives push‑back (§4.4).
+- *Later, online:* Control is shared by all players, with a per‑player daily cap and a threshold that scales with how many people are active, so the map neither stalls with few players nor finishes in an hour with many.
 
-### 4.4 The enemy pushes back (you'll need this)
-If factions never retake ground, the map gets "finished" and stops mattering. Proposal:
-- A server job runs every N hours: factions regain Control in zones that nobody attacked recently, and can **counter‑attack**
-  Alliance zones along the border (players defend with "Defense" missions in Alliance zones).
-- **Seasons [D5]**: every 4 to 8 weeks the war resolves (rewards for all participants) and the map resets or rotates to a new solar system.
+### 4.4 The enemy pushes back (passive counter‑attack meter)
+If factions never retake ground, the map gets "finished" and stops mattering. Andre's model (v0.2):
 
-### 4.5 Shared online state
-- The map is **eventually consistent**: clients fetch zone state when the map opens and subscribe to live updates (Control % ticking
-  up while you browse is a great "living world" feeling).
-- Runs themselves are **single‑player** in MVP; only results are shared. Real‑time co‑op in the same mission is a much bigger
-  project (netcode, servers) and is listed as a stretch goal **[D6]**.
+- Each enemy faction has a **hidden Counter‑attack meter** (0 → 100) per planet.
+- The meter **fills passively in real time**, including while the game is closed. On load, the game computes elapsed time from the last
+  saved timestamp and applies the gain (capped at, say, 72 hours so a long break doesn't wipe the map).
+- **Fill rate depends on how far the player has pushed** into that faction's territory. Example numbers, to tune later:
+
+  | Player pressure on the faction | Meter gain |
+  |---|---|
+  | Only border zones attacked | 1 point / hour |
+  | Player is 2–3 zones deep, or a zone is partially captured | 2–3 points / hour |
+  | Player is deep in faction territory | 5 points / hour |
+
+  Proposed formula: `rate = base + k × (sum of Control % in partly‑captured zones + zones captured from that faction)`, clamped to a maximum.
+- **At 100** the faction counter‑attacks: it retakes Control on the Alliance's most recently captured border zone (or reduces partial
+  Control in contested zones), and the meter resets to 0.
+- **Optional, later:** a warning when the meter passes ~80 ("Swarm fleet massing near Sector 4"), and a **Defense mission** that lowers the meter.
+  This lets the player react instead of just watching the bar.
+- **Seasons [D5]** (resets/rotating systems) only matter once the map is online, so they're deferred.
+
+### 4.5 Shared online state (later)
+Not in the first version. The design keeps it possible:
+- All zone and progression logic lives behind one `GameStateStore` interface. Offline it reads and writes the local save; later
+  a Supabase implementation (§6.4) can replace it without touching gameplay.
+- Online, the map is **eventually consistent**: clients fetch zone state when the map opens and subscribe to live updates, and the push‑back meter runs on the server.
+- Runs stay **single‑player**; real‑time co‑op in the same mission is a much bigger project and remains a stretch goal **[D6]**.
 
 ---
 
@@ -207,8 +238,9 @@ audio, UI, particles and so on yourself. **Unity WebGL is not recommended** for 
   fullscreen button. Good for the public release.
 - **Both [D8]:** Pages for nightly/dev, itch.io for public releases. Both read from the same backend.
 
-### 6.4 Backend [D9]
-Static hosts can't store accounts or shared state, so we need a hosted backend. Both options below have usable free tiers.
+### 6.4 Backend [D9] (later, not in the first version)
+Static hosts can't store accounts or shared state, so the online phase needs a hosted backend. Both options below have usable free tiers.
+Until then everything is saved locally in the browser.
 
 | | **Supabase** | **Firebase** |
 |---|---|---|
@@ -224,7 +256,7 @@ Static hosts can't store accounts or shared state, so we need a hosted backend. 
 **Recommendation: Supabase.** The zone map is relational (planets → zones → adjacency → runs), server logic is free and in
 TypeScript, realtime is built in, and you can host in the EU.
 
-### 6.5 Data model sketch (Supabase)
+### 6.5 Data model sketch (Supabase, later)
 ```
 profiles(id ↔ auth.users, display_name, created_at, credits, season_xp)
 ship_unlocks(user_id, ship_id)
@@ -243,17 +275,20 @@ the client plays → `finish_run` validates (see §7.1), awards credits, and add
 `zones.control_pct` and flips ownership → clients get the change over realtime. Clients **never** write credits or zone state directly (RLS denies it).
 
 ### 6.6 Save data
-- **Cloud:** meta progression (credits, unlocks, upgrades) lives server‑side, changed only by edge functions.
-- **Local:** settings, keybinds, and a guest profile in `localStorage`/IndexedDB.
-- **Guest → account upgrade:** let people play immediately as a guest (Supabase anonymous auth) and link an account later
-  without losing progress. Forced sign‑up before the first run kills web conversion **[D10]**.
+- **Now (offline):** everything (credits, unlocks, upgrades, zone Control, push‑back meters, last‑played timestamp, settings) is saved in
+  the browser's IndexedDB/`localStorage`.
+- **Export/import save** as a file in settings. Browser storage can be wiped when the player clears site data, and itch.io and
+  GitHub Pages are different websites with separate storage, so this is the player's backup until cloud saves exist.
 - **Versioned save schema** with migrations from day one.
+- **Later (online):** meta progression moves server‑side. Players keep playing as guests and link an account later, and the
+  existing local save is uploaded on first login **[D10]**.
 
 ---
 
 ## 7. Things you didn't list but will need
 
-### 7.1 Anti‑cheat (for the shared map)
+### 7.1 Anti‑cheat (only matters once the map is online)
+While the game is offline and single‑player, cheating only affects the cheater, so no anti‑cheat is needed. For later:
 Any browser game can be modified, so assume the client can lie. The goal is to make cheating **pointless for the shared map**, not impossible.
 1. **Server‑authoritative economy:** credits and zone control are computed server‑side from submitted results; the client never sets them.
 2. **Plausibility checks in `finish_run`:** wall‑clock duration vs. claimed duration (server timestamp from `start_run`), max
@@ -264,7 +299,8 @@ Any browser game can be modified, so assume the client can lie. The goal is to m
 Because the game is co‑op (no PvP, no leaderboard money), the stakes are low; points 1 to 3 are enough for launch.
 
 ### 7.2 Performance with many enemies
-- Budget: **60 fps on a mid laptop with 500+ enemies and 1,000+ projectiles**, and 30 fps on mid phones with reduced caps.
+- Budget (v0.2): **60 fps on a mid laptop with ~150 active enemies, several capital ships, ~800 projectiles and the 3D planet backdrop**, and 30 fps on mid phones with reduced caps.
+  Fewer enemies leaves room for better‑looking models, effects and the planet, which is where the GPU budget goes now.
 - GPU **instancing** for enemies, projectiles and pickups (one draw call per type); **object pooling** (no allocations in the loop).
 - Simulation on 2D circles with a **spatial hash**; no physics engine for combat.
 - XP shard **merging** when too many lie on the floor (Vampire Survivors does this too).
@@ -283,12 +319,26 @@ Because the game is co‑op (no PvP, no leaderboard money), the stakes are low; 
 - Later: wrap the web build as an app (Capacitor) if you want store presence.
 
 ### 7.5 Analytics and balancing
-- Log anonymous run telemetry to the backend: ship, zone tier, death time, cause of death, upgrades picked/skipped, credits earned.
+- *Later (needs a backend and a privacy note):* log anonymous run telemetry: ship, zone tier, death time, cause of death, upgrades picked/skipped, credits earned.
   This is **the** tool for balancing a survivors‑like.
 - Product analytics: prefer **cookie‑less, privacy‑friendly** options (own Supabase table, Plausible, or self‑hosted Umami) so no cookie banner is needed.
 - Error reporting (e.g. Sentry free tier) for browser crashes.
 
-### 7.6 Legal and privacy (you're in Germany/EU, so GDPR applies)
+### 7.6 Legal and privacy (you're in Germany/EU)
+**What the terms mean** (plain explanation, not legal advice):
+- **GDPR** (German: DSGVO) is the EU's data‑protection law. It applies when you collect personal data such as emails, account IDs,
+  IP addresses or tracking data. It requires a privacy policy and lets players ask for their data to be deleted.
+- **Impressum** is a German "legal notice" page with the name and contact address of whoever is responsible for a website. German law
+  requires it for online services offered in a business‑like way. Whether a free hobby game needs one is a grey area.
+
+**What that means for us right now:** the offline, free version stores everything in the player's own browser and collects nothing,
+so there is almost nothing to do. itch.io and GitHub run their own hosting and have their own privacy policies.
+- Don't add analytics or error reporting that send data until we've written a short privacy note.
+- Avoid loading fonts or scripts from third‑party servers at runtime (bundle them instead). German courts have treated
+  loading Google Fonts from Google's servers as sending the visitor's IP address without consent.
+- If you publish under your real name or use a custom domain, consider a simple Impressum page; it costs nothing to add.
+
+**When the online version arrives**, this list applies:
 - **Privacy policy** (what you store: email/OAuth ID, display name, progress, telemetry; where: EU region; how long; how to delete).
 - **Account deletion and data export** in the settings screen.
 - **Impressum:** German law can require one for publicly offered online services, depending on how commercial the offering is. Check this before a public launch.
@@ -300,7 +350,8 @@ Because the game is co‑op (no PvP, no leaderboard money), the stakes are low; 
   This is one reason to keep the placeholder names until later.
 
 ### 7.7 Other
-- **Monetization [D12]:** free, donations (itch "pay what you want"), cosmetics, or paid. This affects which asset licences are allowed (no "NC" assets if you ever charge).
+- **Monetization [D12]: decided, free to play.** Still prefer CC0/CC‑BY assets over "NonCommercial" ones: an optional itch.io
+  donation or tip counts as commercial for some licences, and it keeps the option open.
 - **Localization:** English + German from the start is cheap if all strings live in one file.
 - **Accessibility:** colour‑blind‑safe faction colours, screen‑shake/flash toggles, remappable keys, readable font sizes.
 - **Art direction:** mixing free packs from different artists looks inconsistent. Choose **one style** early (recommendation: stylized low‑poly,
@@ -354,12 +405,12 @@ Guiding rule: **prove the run is fun offline before building anything online.**
 |---|---|---|---|
 | **M0: Greybox prototype** | Is it fun? | Project setup + CI deploy to Pages; 1 ship (boxes OK); WASD/mouse movement with inertia; tilted camera; 3 enemy types; 3 weapons; XP + level‑up choice; 10 min timer; one static planet backdrop | Andre plays 5 runs and wants a 6th |
 | **M1: Vertical slice** | One great‑looking mission | Real assets in one art style; 2–3 ships; ~8 weapons + 2 evolutions; resources (ore/energy/salvage); mini‑boss + boss; credits + meta upgrade screen; local save; audio; perf budget met | Shareable with friends as a link |
-| **M2: Map (offline)** | Conquest structure | Solar map (1 system), 2 planets/biomes, tactical zone map with adjacency, depth → difficulty tiers; mock zone state stored locally | Picking zones changes the mission |
-| **M3: Online** | Shared war | Supabase project (EU); guest + account login; cloud save; `start_run`/`finish_run` with validation; capped contribution; zone flipping; realtime map updates; faction push‑back job | Two people on different PCs move the same zone |
-| **M4: Public beta** | Release on itch.io | 3 factions, 3 biomes, 3 ships; settings/accessibility; telemetry + error reporting; privacy policy/Impressum/deletion; touch controls; itch page | Public itch.io release |
-| **M5: Live** | Retention | Seasons, events, more systems/planets, cosmetics, news panel, optional real‑time co‑op research | Ongoing |
+| **M2: Conquest map (offline)** | Conquest structure | Solar map (1 system), 2 planets/biomes, tactical zone map with adjacency, depth → difficulty tiers; zone Control saved locally; passive faction push‑back meter (§4.4); save export/import | Capturing zones changes the next missions, and factions take ground back while you're away |
+| **M3: Public release (offline)** | Release on itch.io | 3 factions, 3 biomes, 3 ships; settings/accessibility; touch controls; itch page; GitHub Pages build | Public itch.io release |
+| **M4: Online (later)** | Shared war | Supabase project (EU); guest + account login; cloud save; run validation; shared zones; realtime map; server‑side push‑back; privacy policy and account deletion | Two people on different PCs move the same zone |
+| **M5: Live (later)** | Retention | Seasons, events, more systems/planets, cosmetics, news panel | Ongoing |
 
-Rough order of difficulty: M0 and M1 are the bulk of the *game* work, and M3 is the bulk of the *online* work. M0 is a few focused sessions.
+M0 and M1 are the bulk of the *game* work. M4 is the bulk of the *online* work and is deliberately last.
 
 ---
 
@@ -372,16 +423,17 @@ You can answer these one by one; the recommendation is what we'll assume until y
 | **D1** | Mission length | 8 / 12 / 15 / 30 min | **12 min** |
 | **D2** | Weapon aiming | Arcs per hardpoint (steering aims) / 360° auto‑aim | **Arcs** for broadside guns, turrets 360° |
 | **D3** | Role of resources | As in §3.4 / resources also feed level‑ups / other | **§3.4 proposal** |
-| **D4** | Zone capture rule | Control % with capped contributions (scaled to players) / fixed number of players | **Control % + caps + scaling** |
-| **D5** | Seasons | Persistent map / resets every 4–8 weeks / rotate solar systems | **Seasons (~6 weeks)**, decide after M3 |
-| **D6** | Real‑time co‑op in missions | No (shared map only) / later stretch goal | **Shared map only for MVP** |
+| **D4** | Zone capture rule | Control % per zone (offline, §4.3) | ✅ **Decided:** Control %, passive push‑back meter (§4.4); exact numbers tuned in M2 |
+| **D5** | Seasons | Persistent map / resets / rotate solar systems | ⏸ **Later** (online only) |
+| **D6** | Real‑time co‑op in missions | No / later stretch goal | ⏸ **Later** |
 | **D7** | Engine | Babylon.js / Three.js / Godot 4 / Unity | **Babylon.js + TypeScript**; Godot if you want a visual editor |
 | **D8** | Hosting | GitHub Pages / itch.io / both | **Both** (Pages = dev, itch = public) |
-| **D9** | Backend | Supabase / Firebase / other | **Supabase (EU region)** |
-| **D10** | Login | Required at start / guest first, link account later | **Guest first** |
+| **D9** | Backend | Supabase / Firebase / other | ⏸ **Later**; Supabase (EU) is the current favourite |
+| **D10** | Login | Guest first, link account later | ⏸ **Later**; no accounts in the first version |
 | **D11** | Platforms | Desktop only / desktop first, touch‑ready / mobile first | **Desktop first, touch‑ready** |
-| **D12** | Monetization | Free / donations / cosmetics / paid | **Free + donations**, decide before M4 |
+| **D12** | Monetization | Free / donations / cosmetics / paid | ✅ **Decided: free to play** |
+| **D15** | Enemy density | Thousands of small / ~60–150 tougher in formations | ✅ **Decided: fewer, tougher, armada feel** (§3.5) |
 | **D13** | Art style | Stylized low‑poly / realistic PBR / other | **Stylized low‑poly** |
-| **D14** | Final names | Keep placeholders until M4 | **Keep placeholders**, trademark check before naming |
+| **D14** | Final names | Keep placeholders until public release (M3) | **Keep placeholders**, trademark check before naming |
 
 **Next step after decisions:** start **M0** (repo scaffold, CI deploy to GitHub Pages, greybox ship, movement and camera).
