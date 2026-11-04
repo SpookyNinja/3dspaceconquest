@@ -162,6 +162,11 @@ tiny enemies, the target is roughly **60–150 active enemies** on screen, weigh
 **Solar map** (one system to start, about 5 planets) → **Planet** → **Tactical map**: the planet surface is split into
 **zones** (hex grid or Voronoi regions, about 20 to 40 per planet), each owned by the Alliance or a faction.
 
+**First prototype planets (Andre, v0.3):**
+- **Megacity planet\***: almost the whole surface is one endless metropolis. Mission backdrop: skyscrapers, lit streets and traffic far below,
+  fires and smoke where the city is under attack.
+- **Ocean planet\***: almost entirely water. Mission backdrop: animated ocean with waves and foam, scattered islands, floating platforms and naval wrecks.
+
 Each planet has a **biome** that sets the mission backdrop (jungle, city under siege, ocean, desert, ice) and a
 dominant enemy faction.
 
@@ -447,7 +452,7 @@ Guiding rule: **prove the run is fun offline before building anything online.**
 |---|---|---|---|
 | **M0: Greybox prototype** | Is it fun? | Project setup + CI deploy to Pages; 1 ship (boxes OK); WASD/mouse movement with inertia; tilted camera; 3 enemy types; 3 weapons; XP + level‑up choice; 10 min timer; one static planet backdrop | Andre plays 5 runs and wants a 6th |
 | **M1: Vertical slice** | One great‑looking mission | Real assets in one art style; 2–3 ships; ~8 weapons + 2 evolutions; resources (ore/energy/salvage); mini‑boss + boss; credits + meta upgrade screen; local save; audio; perf budget met | Shareable with friends as a link |
-| **M2: Conquest map (offline)** | Conquest structure | Solar map (1 system), 2 planets/biomes, tactical zone map with adjacency, depth → difficulty tiers; zone Control saved locally; passive faction push‑back meter (§4.4); save export/import | Capturing zones changes the next missions, and factions take ground back while you're away |
+| **M2: Conquest map (offline)** | Conquest structure | Solar map (1 system), 2 planets (Megacity\* and Ocean\*), tactical zone map with adjacency, depth → difficulty tiers; zone Control saved locally; passive faction push‑back meter (§4.4); save export/import | Capturing zones changes the next missions, and factions take ground back while you're away |
 | **M3: Public release (offline)** | Release on itch.io | 3 factions, 3 biomes, 3 ships; settings/accessibility; touch controls; itch page; GitHub Pages build | Public itch.io release |
 | **M4: Online (later)** | Shared war | Supabase project (EU); guest + account login; cloud save; run validation; shared zones; realtime map; server‑side push‑back; privacy policy and account deletion | Two people on different PCs move the same zone |
 | **M5: Live (later)** | Retention | Seasons, events, more systems/planets, cosmetics, news panel | Ongoing |
