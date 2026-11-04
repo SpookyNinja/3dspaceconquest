@@ -79,7 +79,7 @@ into enemy faction territory while the factions push back. *Later:* all online p
 - **Lose:** hull reaches 0 before the timer. Still pays credits (less), and adds a little Control if the run got far.
 
 ### 3.2 Ships (selection in hangar)
-Gameplay happens on a flat 2D plane (XZ) and is rendered in 3D. Starting roster proposal (3 ships for MVP, more later):
+Gameplay happens on a flat 2D plane (XZ) and is rendered in 3D. Every player ship is a **big battlecruiser‑class capital ship**, many times larger than the typical enemy fighter. Starting roster proposal (3 ships for MVP, more later):
 
 | Ship\* | Speed / turn | Hull | Identity |
 |---|---|---|---|
@@ -141,7 +141,8 @@ Upgrades can change a weapon's mode (for example "Rail battery: Hunter‑killer,
 **Fewer, tougher enemies that still feel like an armada (v0.2).** Rather than Vampire Survivors' thousands of
 tiny enemies, the target is roughly **60–150 active enemies** on screen, weighted toward bigger, tougher types. The "armada" feeling comes from:
 - **Formations and squadrons:** enemies arrive as wings in V‑shapes and lines, not as random dots, so 12 ships read as one fleet.
-- **Size tiers:** fighters (swarm, die in one hit) → frigates → cruisers → capital ships with multiple destroyable hardpoints.
+- **Scale contrast (Andre, v0.3):** the player's battlecruiser is **huge**; enemies are **mostly small ships and fighters** swarming around it.
+  Size tiers: fighters (most common, die fast) → gunships/bombers → frigates (uncommon) → rare elite cruisers and bosses, which are the only enemies close to the player's size.
 - **Carriers that launch fighters** keep the screen busy cheaply.
 - **Background fleet:** non‑interactive enemy and Alliance capital ships fighting far below and around the play area (cheap, low detail, never collide).
 - **Warp‑in effects and big wave announcements** ("Enemy battle group inbound").
