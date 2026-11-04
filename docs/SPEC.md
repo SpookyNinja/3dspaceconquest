@@ -212,6 +212,27 @@ If factions never retake ground, the map gets "finished" and stops mattering. An
   This lets the player react instead of just watching the bar.
 - **Seasons [D5]** (resets/rotating systems) only matter once the map is online, so they're deferred.
 
+### 4.5 Planet zone map: look and multiple factions (Andre, v0.3)
+Reference: [`docs/reference/zone-map-reference.webp`](reference/zone-map-reference.webp) (a fantasy strategy map Andre found). We build a **sci‑fi version** of the same ideas on the 3D globe.
+
+**What we take from the reference**
+- **Zones tinted in their owner's colour** with glowing borders; the colour flows across the planet so the front lines are readable at a glance.
+- **One marker per zone** standing on the globe: a holographic faction emblem/banner instead of cloth flags.
+- **Contested zones** show a small **tug‑of‑war bar** between the two sides fighting over it (Alliance Control % vs. the owner).
+- **Attack arrows** (animated, glowing chevrons) from zone to zone show where an attack is coming from. This is also how the passive push‑back (§4.4) becomes visible: an arrow grows toward an Alliance zone as a faction's meter fills.
+- **Zone names** on the map, plus landmark icons (spaceport, capital, shipyard).
+
+**Sci‑fi styling:** dark planet surface with the city lights or ocean visible underneath, holographic overlay for zone colours and borders,
+scan‑line/grid effect, emblems as floating holograms, faction colours with clear contrast (and colour‑blind‑safe patterns or icons).
+
+**2 to 3 factions per planet**
+- Each planet starts with the Alliance foothold plus **2 or 3 enemy factions** holding the rest.
+- **Enemy factions also fight each other.** In the same passive, real‑time simulation as §4.4, factions occasionally take zones from each other along their shared borders.
+  The map keeps shifting even when the player isn't playing, which makes it feel alive.
+- The player can attack **any** enemy zone touching Alliance territory, so choosing which faction to push is a real decision. Pushing one faction hard raises **that** faction's counter‑attack meter, while a neighbouring faction may take advantage and expand.
+- **Missions are themed by the zone's owner**: which enemies spawn, their colours, and the boss depend on the faction that holds the zone.
+- **Prototype:** the megacity planet and the ocean planet each get 2 enemy factions; a third can be added once the basics work.
+
 ### 4.5 Shared online state (later)
 Not in the first version. The design keeps it possible:
 - All zone and progression logic lives behind one `GameStateStore` interface. Offline it reads and writes the local save; later
