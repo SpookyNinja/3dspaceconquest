@@ -1,6 +1,6 @@
 # Space Conquest* — Game Plan & Design Spec
 
-> Status: **Draft v0.3** (2026-11-04). Names marked with `*` are placeholders.
+> Status: **Draft v0.4** (2026-11-04). Names marked with `*` are placeholders.
 > Every open choice is tagged **[D#]** and collected in [§10 Decisions for Andre](#10-decisions-for-andre).
 > Each one has a recommendation, so we can start building on the defaults and change course later.
 >
@@ -14,6 +14,13 @@
 > - **Engine: Babylon.js**, chosen by Claude because Andre won't work in the engine directly (§6.1).
 > - **Mission length:** a regular timer that grows with zone difficulty, then optional **endless mode** (§3.1).
 > - **Weapons aim themselves.** Many weapon types with their own behaviour and targeting preferences (§3.4.1).
+>
+> **v0.4 decisions by Andre (first playtest, 2026-11-04):**
+> - **XP is gained directly on every kill.** No XP shards to collect (§3.4).
+> - The player's battlecruiser is **much bigger and more sluggish**: an imperial‑star‑destroyer feel against small fighters and smaller warships (§3.2, §3.3).
+> - Zones are picked on a **flat tactical map** per planet, not on the globe (§4.1, §4.5).
+> - **Every enemy zone that touches Alliance territory is a mission** (§4.2).
+> - Screen flow starts with a **3D solar system**: sun in the middle, the planets orbiting it; clicking a planet opens its zone map (§5.3).
 
 ---
 
@@ -79,7 +86,9 @@ into enemy faction territory while the factions push back. *Later:* all online p
 - **Lose:** hull reaches 0 before the timer. Still pays credits (less), and adds a little Control if the run got far.
 
 ### 3.2 Ships (selection in hangar)
-Gameplay happens on a flat 2D plane (XZ) and is rendered in 3D. Every player ship is a **big battlecruiser‑class capital ship**, many times larger than the typical enemy fighter. Starting roster proposal (3 ships for MVP, more later):
+Gameplay happens on a flat 2D plane (XZ) and is rendered in 3D. Every player ship is a **huge battlecruiser‑class capital ship**, many times larger than the typical enemy fighter.
+**Scale and feel (Andre, v0.4):** think of an imperial star destroyer against fighter jets and small warships. The prototype ship
+is about 120 m long on screen (scale 7), roughly 10 to 20 times a fighter, and the camera sits further out so the ship still leaves room to see the fight. Starting roster proposal (3 ships for MVP, more later):
 
 | Ship\* | Speed / turn | Hull | Identity |
 |---|---|---|---|
@@ -92,7 +101,8 @@ resources. Each weapon system has its own firing behaviour and its own **targeti
 turrets/launchers on the ship model, so the tilted camera shows them turning and firing.
 
 ### 3.3 Movement
-- Ships have **mass**: acceleration, max speed, turn rate and drift.
+- Ships have **mass**: acceleration, max speed, turn rate and drift. Capital ships are **sluggish** (v0.4): slow to reach top speed
+  (about 4 s), slow to stop, and a full turn takes many seconds. Prototype values: speed 42, acceleration 11, turn 0.32 rad/s.
 - **WASD**: thrust in that direction relative to the screen; the ship rotates toward the movement vector at its turn rate.
 - **Mouse**: hold left click to fly toward the cursor (or click to set a waypoint).
 - **Gamepad**: left stick. **Touch**: floating virtual joystick (see §7.4).
@@ -101,7 +111,7 @@ turrets/launchers on the ship model, so the tilted camera shows them turning and
 ### 3.4 In‑run progression
 | Source | What it gives |
 |---|---|
-| **XP shards** (dropped by kills) | Fills the XP bar → **Level up: choose 1 of 3** (new weapon, weapon upgrade, passive buff) |
+| **XP from kills** (gained instantly, no pickup; v0.4) | Fills the XP bar → **Level up: choose 1 of 3** (new weapon, weapon upgrade, passive buff) |
 | **Ore** (asteroids/wrecks you must fly to) | Hull repair + armor stacks |
 | **Energy** (nebula pockets, drifting) | Charges the active ability / overdrive |
 | **Salvage** (rare, from elites) | Bonus credits at run end + 1 reroll/banish token |
@@ -159,16 +169,15 @@ tiny enemies, the target is roughly **60–150 active enemies** on screen, weigh
 ## 4. Galaxy, planets and zone conquest
 
 ### 4.1 Hierarchy
-**Solar map** (one system to start, about 5 planets) → **Planet** → **Tactical map**: the planet surface is split into
-**zones** (hex grid or Voronoi regions, about 20 to 40 per planet), each owned by the Alliance or a faction.
+**Solar system** (3D, one system to start with a sun and 2 planets, more later) → **Planet zone map** (flat tactical map) → **Mission** on the zone's surface.
 
-**Missions happen on the planet's surface (Andre, v0.3):**
-- The tactical map is the **3D planet globe** with the zones laid across its whole surface, coloured by owner. The player rotates the
-  globe to pick a zone.
-- Selecting a zone and starting the mission plays a **descent transition**: the camera dives from orbit through the clouds down to
-  that zone's location, and the battlecruiser arrives low over the surface.
-- The mission then plays **over that zone's own patch of ground**, so each zone looks different (see §5.2). After the mission the
-  camera climbs back to orbit and the zone's new colour/Control is shown on the globe.
+- **Solar system screen (v0.4):** a 3D view with the sun in the middle and the planets on their orbits. Clicking a planet flies the camera to it and opens its zone map.
+- **Zone map (v0.4): a flat tactical map**, not the globe. Each planet's surface is split into about **40 Voronoi zones**, each owned by the
+  Alliance or an enemy faction. The map is generated from a fixed seed per planet, so every player sees the same map and the
+  save only stores Control per zone ID.
+- Selecting a zone and starting the mission zooms the map into that zone and cuts to the surface, where the battlecruiser arrives low over the ground.
+- **Missions happen on the planet's surface (v0.3):** the mission plays over that zone's patch of ground, so each zone looks different (see §5.2).
+  After the mission the player returns to the zone map, which shows the zone's new Control or colour.
 
 **First prototype planets (Andre, v0.3):**
 - **Megacity planet\***: almost the whole surface is one endless metropolis. Mission backdrop: skyscrapers, lit streets and traffic far below,
@@ -179,9 +188,12 @@ Each planet has a **biome** that sets the mission backdrop (jungle, city under s
 dominant enemy faction.
 
 ### 4.2 Which zones are playable
-- A zone is **attackable** if it is enemy‑owned and adjacent to an Alliance zone (the front line).
+- A zone is **attackable** if it is enemy‑owned and adjacent to an Alliance zone (the front line). **Every** such zone is a mission (v0.4); there are no hand‑picked mission zones.
+- Each planet starts with a small Alliance foothold (3 to 4 zones), so there are always several zones to choose from (6 to 9 in the prototype).
 - **Depth** = distance in zones from the original Alliance foothold, or from the nearest Alliance‑held border. Deeper means a
   higher **difficulty tier** and better credit multiplier. This matches your "the further we push, the harder it gets".
+  Prototype rule: `tier = planet base tier + floor((depth − 1) / 2)`, +1 for a faction **capital (fortress)** zone, max 5.
+  Megacity starts at tier 1, Ocean at tier 2.
 
 ### 4.3 Capture rule (offline version) [D4]
 Each zone has **Control** from 0 to 100% for the Alliance.
@@ -213,17 +225,17 @@ If factions never retake ground, the map gets "finished" and stops mattering. An
 - **Seasons [D5]** (resets/rotating systems) only matter once the map is online, so they're deferred.
 
 ### 4.5 Planet zone map: look and multiple factions (Andre, v0.3)
-Reference: [`docs/reference/zone-map-reference.webp`](reference/zone-map-reference.webp) (a fantasy strategy map Andre found). We build a **sci‑fi version** of the same ideas on the 3D globe.
+Reference: [`docs/reference/zone-map-reference.webp`](reference/zone-map-reference.webp) (a fantasy strategy map Andre found). We build a **sci‑fi version** of the same ideas as a **flat map**, very close to the reference's layout (v0.4).
 
 **What we take from the reference**
 - **Zones tinted in their owner's colour** with glowing borders; the colour flows across the planet so the front lines are readable at a glance.
-- **One marker per zone** standing on the globe: a holographic faction emblem/banner instead of cloth flags.
+- **One marker per zone**: a faction emblem badge (hexagonal for capitals/fortresses) instead of cloth flags.
 - **Contested zones** show a small **tug‑of‑war bar** between the two sides fighting over it (Alliance Control % vs. the owner).
 - **Attack arrows** (animated, glowing chevrons) from zone to zone show where an attack is coming from. This is also how the passive push‑back (§4.4) becomes visible: an arrow grows toward an Alliance zone as a faction's meter fills.
 - **Zone names** on the map, plus landmark icons (spaceport, capital, shipyard).
 
 **Sci‑fi styling:** dark planet surface with the city lights or ocean visible underneath, holographic overlay for zone colours and borders,
-scan‑line/grid effect, emblems as floating holograms, faction colours with clear contrast (and colour‑blind‑safe patterns or icons).
+scan‑line/grid effect, corner‑bracket frame, faction colours with clear contrast (and colour‑blind‑safe patterns or icons).
 
 **2 to 3 factions per planet**
 - Each planet starts with the Alliance foothold plus **2 or 3 enemy factions** holding the rest.
@@ -231,7 +243,7 @@ scan‑line/grid effect, emblems as floating holograms, faction colours with cle
   The map keeps shifting even when the player isn't playing, which makes it feel alive.
 - The player can attack **any** enemy zone touching Alliance territory, so choosing which faction to push is a real decision. Pushing one faction hard raises **that** faction's counter‑attack meter, while a neighbouring faction may take advantage and expand.
 - **Missions are themed by the zone's owner**: which enemies spawn, their colours, and the boss depend on the faction that holds the zone.
-- **Prototype:** the megacity planet and the ocean planet each get 2 enemy factions; a third can be added once the basics work.
+- **Prototype:** Megacity has 2 enemy factions (Iron Concord, Void Cult), Ocean has 3 (Swarm, Iron Concord, Void Cult).
 
 ### 4.5 Shared online state (later)
 Not in the first version. The design keeps it possible:
@@ -261,8 +273,9 @@ Not in the first version. The design keeps it possible:
 - This is purely visual; it never collides, so it can be cheap (low‑poly, baked lighting).
 
 ### 5.3 UI screens
-Title/login → Hangar (ship, loadout, upgrades) → Solar map → Tactical map → Mission (HUD: hull, XP bar, timer, resources,
-minimap edge indicators) → Level‑up modal (pause) → Results (credits, contribution, zone progress) → back to Hangar.
+Title/login → **Solar system** (3D, click a planet) → **Planet zone map** (flat, pick a front‑line zone; the hangar with upgrades sits beside it)
+→ Mission (HUD: hull, XP bar, timer, resources, minimap edge indicators) → Level‑up modal (pause) → Results (credits, contribution, zone progress)
+→ back to the zone map. A back button on the zone map returns to the solar system.
 
 ---
 

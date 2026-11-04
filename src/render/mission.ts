@@ -58,7 +58,7 @@ export class MissionView {
   private camZ = 0;
   private shake = 0;
   private bank = 0;
-  zoom = 400;
+  zoom = 560;
   shakeEnabled = true;
   private time = 0;
   private glow!: GlowLayer;

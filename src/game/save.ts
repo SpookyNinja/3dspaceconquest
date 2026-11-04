@@ -1,6 +1,7 @@
-import { META, MetaId, PLANETS, CONTROL } from './data';
+import { META, MetaId, CONTROL, FactionId } from './data';
+import { zoneById } from './zones';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const KEY = 'spaceconquest.save';
 
 export interface SaveData {
@@ -41,6 +42,8 @@ export function migrate(raw: unknown): SaveData {
     version: SAVE_VERSION,
   };
   if (!Number.isFinite(out.credits) || out.credits < 0) out.credits = 0;
+  // v1 had three hand-placed zones per planet; v2 zone maps use new ids, so old Control entries are dropped.
+  for (const id of Object.keys(out.control)) if (!zoneById(id)) delete out.control[id];
   return out;
 }
 
@@ -89,11 +92,18 @@ export function isCaptured(s: SaveData, zoneId: string): boolean {
   return (s.control[zoneId] ?? 0) >= 100;
 }
 
-/** A zone is attackable if it is not captured and its required neighbour is (SPEC §4.2). */
+/** Who holds a zone right now: the Alliance once captured, otherwise its starting owner. */
+export function holder(s: SaveData, zoneId: string): FactionId {
+  const z = zoneById(zoneId);
+  if (!z) return 'alliance';
+  return z.owner === 'alliance' || isCaptured(s, zoneId) ? 'alliance' : z.owner;
+}
+
+/** Any enemy zone that borders Alliance territory can be attacked (SPEC §4.2, Andre 2026-11-04). */
 export function isAttackable(s: SaveData, zoneId: string): boolean {
-  const zone = PLANETS.flatMap((p) => p.zones).find((z) => z.id === zoneId);
-  if (!zone || isCaptured(s, zoneId)) return false;
-  return zone.requires === null || isCaptured(s, zone.requires);
+  const z = zoneById(zoneId);
+  if (!z || holder(s, zoneId) === 'alliance') return false;
+  return z.neighbours.some((n) => holder(s, n) === 'alliance');
 }
 
 export interface RunOutcome {

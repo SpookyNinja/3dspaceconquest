@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { World, NO_META, DT } from '../src/game/world';
 import { Rng } from '../src/game/rng';
-import { computeRewards, migrate, newSave, buyMeta, isAttackable } from '../src/game/save';
+import { computeRewards, migrate, newSave, buyMeta, isAttackable, holder } from '../src/game/save';
+import { ZONE_MAPS, zoneById } from '../src/game/zones';
+import { PLANETS } from '../src/game/data';
 
 function simulate(seconds: number, seed = 1, tier = 1) {
   const w = new World({ seed, tier, duration: 480, meta: NO_META });
@@ -64,23 +66,55 @@ describe('save and rewards', () => {
     expect(s.settings.volume).toBeGreaterThan(0);
   });
   it('losing still pays, winning pays more', () => {
-    const base = { zoneId: 'mc_spire', tier: 1, bossKilled: false, duration: 480, endlessTime: 0, kills: 200, enemyCredits: 80 };
+    const base = { zoneId: 'megacity-00', tier: 1, bossKilled: false, duration: 480, endlessTime: 0, kills: 200, enemyCredits: 80 };
     const lose = computeRewards({ ...base, success: false, time: 200 }, 0);
     const win = computeRewards({ ...base, success: true, time: 480 }, 0);
     expect(lose.total).toBeGreaterThan(0);
     expect(win.total).toBeGreaterThan(lose.total);
     expect(win.controlGain).toBe(35);
   });
-  it('buying meta upgrades costs credits and front line gates zones', () => {
+  it('buying meta upgrades costs credits', () => {
     const s = newSave();
     expect(buyMeta(s, 'm_hull')).toBe(false);
     s.credits = 1000;
     expect(buyMeta(s, 'm_hull')).toBe(true);
     expect(s.credits).toBe(940);
-    expect(isAttackable(s, 'mc_spire')).toBe(true);
-    expect(isAttackable(s, 'mc_docks')).toBe(false);
-    s.control.mc_spire = 100;
-    expect(isAttackable(s, 'mc_docks')).toBe(true);
-    expect(isAttackable(s, 'oc_shallows')).toBe(true);
+  });
+  it('drops Control for zone ids that no longer exist', () => {
+    const s = migrate({ version: 1, control: { mc_spire: 100, 'megacity-03': 40 } });
+    expect(s.control).toEqual({ 'megacity-03': 40 });
+  });
+});
+
+describe('zone maps', () => {
+  it('every planet starts with several attackable zones, all bordering the Alliance', () => {
+    const s = newSave();
+    for (const p of PLANETS) {
+      const zones = ZONE_MAPS[p.id].zones;
+      const att = zones.filter((z) => isAttackable(s, z.id));
+      expect(att.length).toBeGreaterThanOrEqual(3);
+      for (const z of zones) {
+        const borders = z.owner !== 'alliance' && z.neighbours.some((n) => zoneById(n)!.owner === 'alliance');
+        expect(isAttackable(s, z.id)).toBe(borders);
+      }
+    }
+  });
+  it('neighbours are symmetric and every zone has an owner from the planet', () => {
+    for (const p of PLANETS) {
+      const owners = new Set(['alliance', ...p.factions.map((f) => f.id)]);
+      for (const z of ZONE_MAPS[p.id].zones) {
+        expect(owners.has(z.owner)).toBe(true);
+        for (const n of z.neighbours) expect(zoneById(n)!.neighbours).toContain(z.id);
+      }
+    }
+  });
+  it('capturing a zone pushes the front line to its neighbours', () => {
+    const s = newSave();
+    const z = ZONE_MAPS.ocean.zones.find((x) => isAttackable(s, x.id))!;
+    const behind = z.neighbours.filter((n) => !isAttackable(s, n) && holder(s, n) !== 'alliance');
+    s.control[z.id] = 100;
+    expect(holder(s, z.id)).toBe('alliance');
+    expect(isAttackable(s, z.id)).toBe(false);
+    for (const n of behind) expect(isAttackable(s, n)).toBe(true);
   });
 });

@@ -1,10 +1,12 @@
 import './style.css';
 import { Engine } from '@babylonjs/core';
-import { PLANETS, missionDuration, MetaId, ENEMIES } from './game/data';
+import { PlanetId, missionDuration, MetaId, ENEMIES } from './game/data';
+import { ALL_ZONES, ZONE_MAPS, zoneById } from './game/zones';
 import { World, DT, Choice, MetaBonuses } from './game/world';
-import { SaveData, buyMeta, computeRewards, isAttackable, isCaptured, loadSave, metaLevel, newSave, writeSave } from './game/save';
+import { SaveData, buyMeta, computeRewards, holder, isAttackable, isCaptured, loadSave, metaLevel, newSave, writeSave } from './game/save';
 import { MissionView } from './render/mission';
-import { PlanetMap, ZoneState } from './render/planetMap';
+import { SolarSystem } from './render/system';
+import { ZoneMapView, ZoneView } from './render/zoneMap';
 import { UI, UiHandlers } from './ui';
 import { Audio } from './audio';
 import { InputState } from './input';
@@ -17,9 +19,9 @@ const audio = new Audio();
 let save: SaveData = loadSave();
 audio.volume = save.settings.volume;
 
-type State = 'title' | 'map' | 'loading' | 'mission' | 'results';
+type State = 'title' | 'system' | 'map' | 'loading' | 'mission' | 'results';
 let state: State = 'title';
-const map = new PlanetMap(engine);
+const system = new SolarSystem(engine);
 
 interface Mission {
   world: World;
@@ -39,14 +41,14 @@ const handlers: UiHandlers = {
   start() {
     audio.unlock();
     audio.preload(['laser_small_000', 'explosion_crunch_000', 'explosion_crunch_002', 'impact_metal_000', 'laser_large_000', 'thruster_fire_000']);
-    goMap();
+    goSystem();
   },
   selectPlanet(id) {
-    ui.planet = id;
-    ui.zone = PLANETS.find((p) => p.id === id)!.zones.find((z) => isAttackable(save, z.id))?.id ?? null;
-    map.showPlanet(id);
-    if (ui.zone) map.focusZone(ui.zone);
-    ui.renderMap(save);
+    if (state === 'system') void openPlanet(id, true);
+    else void openPlanet(id, false);
+  },
+  backToSystem() {
+    goSystem();
   },
   selectZone(id) {
     pickZone(id);
@@ -59,7 +61,8 @@ const handlers: UiHandlers = {
       writeSave(save);
       audio.play('force_field_000', 0.5);
     }
-    ui.renderMap(save);
+    if (state === 'system') ui.renderSystem(save);
+    else ui.renderMap(save);
   },
   choose(i) {
     choose(i);
@@ -91,9 +94,10 @@ const handlers: UiHandlers = {
     ui.announce('Endless mode: hold out as long as you can!');
   },
   backToMap() {
+    const planet = mission ? zoneById(mission.zoneId)?.planet : undefined;
     mission?.view.dispose();
     mission = null;
-    goMap();
+    void openPlanet(planet ?? ui.planet, false);
   },
   setVolume(v) {
     save.settings.volume = v;
@@ -109,41 +113,64 @@ const handlers: UiHandlers = {
   resetSave() {
     save = newSave();
     writeSave(save);
-    goMap();
+    goSystem();
   },
 };
 const ui = new UI(handlers);
 
-map.onPick = (id) => pickZone(id);
+const zoneMap = new ZoneMapView(document.getElementById('map')!);
+zoneMap.onPick = (id) => pickZone(id);
+system.onPick = (id) => handlers.selectPlanet(id);
 
-function zoneStates(): Record<string, ZoneState> {
-  const out: Record<string, ZoneState> = {};
-  for (const z of PLANETS.flatMap((p) => p.zones)) out[z.id] = isCaptured(save, z.id) ? 'captured' : isAttackable(save, z.id) ? 'attackable' : 'locked';
+function zoneViews(): Record<string, ZoneView> {
+  const out: Record<string, ZoneView> = {};
+  for (const z of ALL_ZONES) out[z.id] = { holder: holder(save, z.id), attackable: isAttackable(save, z.id), control: save.control[z.id] ?? 0 };
   return out;
 }
 
 function pickZone(id: string) {
-  const planet = PLANETS.find((p) => p.zones.some((z) => z.id === id))!;
-  if (planet.id !== ui.planet) {
-    ui.planet = planet.id;
-    map.showPlanet(planet.id);
-  }
   ui.zone = id;
-  map.focusZone(id);
+  zoneMap.selected = id;
   ui.renderMap(save);
+  if (isAttackable(save, id)) audio.play('computer_noise_000', 0.15, 1.4);
 }
 
-function goMap() {
+function goSystem() {
+  state = 'system';
+  system.reset();
+  ui.renderSystem(save);
+  ui.show('system');
+  ui.fade(false);
+}
+
+/** Solar system → zone map of one planet. With fly, the camera flies to the planet first. */
+async function openPlanet(id: PlanetId, fly: boolean) {
+  if (fly) {
+    state = 'loading';
+    const f = system.flyTo(id);
+    window.setTimeout(() => ui.fade(true), 650);
+    await f;
+  }
   state = 'map';
-  map.reset();
-  map.setZoneStates(zoneStates());
-  if (!ui.zone || !isAttackable(save, ui.zone)) {
-    const next = PLANETS.flatMap((p) => p.zones).find((z) => isAttackable(save, z.id));
-    if (next) pickZone(next.id);
-  } else pickZone(ui.zone);
+  ui.planet = id;
+  zoneMap.show(id);
+  zoneMap.setStates(zoneViews());
+  const keep = ui.zone && zoneById(ui.zone)?.planet === id && isAttackable(save, ui.zone);
+  if (!keep) ui.zone = ZONE_MAPS[id].zones.filter((z) => isAttackable(save, z.id)).sort((a, b) => a.tier - b.tier)[0]?.id ?? null;
+  zoneMap.selected = ui.zone;
   ui.renderMap(save);
   ui.show('map');
+  layoutZoneMap();
   ui.fade(false);
+}
+
+function layoutZoneMap() {
+  const wide = window.innerWidth > 820;
+  const l = document.querySelector('#map .left')?.getBoundingClientRect();
+  const r = document.querySelector('#map .right')?.getBoundingClientRect();
+  zoneMap.margins = wide && l && r
+    ? { left: l.right + 16, right: window.innerWidth - r.left + 16, top: 16, bottom: 16 }
+    : { left: 8, right: 8, top: 8, bottom: Math.round(window.innerHeight * 0.4) };
 }
 
 function metaBonuses(): MetaBonuses {
@@ -159,21 +186,18 @@ function metaBonuses(): MetaBonuses {
 }
 
 async function startMission(zoneId: string, animate: boolean) {
-  const planet = PLANETS.find((p) => p.zones.some((z) => z.id === zoneId))!;
-  const zone = planet.zones.find((z) => z.id === zoneId)!;
+  const zone = zoneById(zoneId)!;
   state = 'loading';
   if (animate) {
-    ui.show('map');
-    ui.fade(false);
-    const dive = map.descend();
-    window.setTimeout(() => ui.fade(true), 700);
+    const dive = zoneMap.zoomInto(zoneId);
+    window.setTimeout(() => ui.fade(true), 800);
     await dive;
   }
   ui.loading(`Descending to ${zone.name}…`);
   const seed = Number(params.get('seed')) || (Date.now() & 0x7fffffff);
   const fast = Number(params.get('fast'));
   const world = new World({ seed, tier: zone.tier, duration: fast > 0 ? fast : missionDuration(zone.tier), meta: metaBonuses() });
-  const view = await MissionView.create(engine, world, planet.id, seed);
+  const view = await MissionView.create(engine, world, zone.planet, seed);
   view.shakeEnabled = save.settings.shake;
   mission = { world, view, zoneId, zoneName: zone.name, acc: 0, paused: false, choices: null, done: false, endQueued: false };
   audio.preload(['laser_small_000', 'laser_small_002', 'explosion_crunch_000', 'explosion_crunch_002', 'low_frequency_explosion_000', 'impact_metal_000', 'computer_noise_000', 'force_field_000', 'force_field_002', 'laser_retro_001', 'laser_large_000', 'thruster_fire_000', 'space_engine_large_000', 'door_open_000', 'low_frequency_explosion_001']);
@@ -199,7 +223,7 @@ function finishMission(abandoned: boolean) {
   if (!mission || mission.done) return;
   mission.done = true;
   const w = mission.world;
-  const zone = PLANETS.flatMap((p) => p.zones).find((z) => z.id === mission!.zoneId)!;
+  const zone = zoneById(mission.zoneId)!;
   const success = w.timerReached;
   const rewards = computeRewards(
     {
@@ -287,7 +311,7 @@ function missionTick(m: Mission, dt: number) {
 }
 
 canvas.addEventListener('wheel', (e) => {
-  if (state === 'mission' && mission) mission.view.zoom = Math.max(300, Math.min(700, mission.view.zoom + e.deltaY * 0.4));
+  if (state === 'mission' && mission) mission.view.zoom = Math.max(420, Math.min(900, mission.view.zoom + e.deltaY * 0.4));
 }, { passive: true });
 
 let last = performance.now();
@@ -300,18 +324,39 @@ engine.runRenderLoop(() => {
   } else if (state === 'results' && mission) {
     mission.view.frame(0, dt);
     mission.view.render();
+  } else if (state === 'map') {
+    zoneMap.render(dt);
+  } else if (state === 'loading' && !mission) {
+    if (ui.planet && document.querySelector('#map.on')) zoneMap.render(dt);
+    else {
+      system.update(dt);
+      system.render();
+    }
   } else {
-    map.update(dt);
-    map.render();
+    system.update(dt);
+    system.render();
+    if (state === 'system') {
+      const l = document.querySelector('#system .left')?.getBoundingClientRect();
+      system.screenShift = l && window.innerWidth > 820 ? l.right / 2 : 0;
+      ui.placeLabels((id) => system.labelPos(id), system.hover);
+    }
   }
 });
-window.addEventListener('resize', () => engine.resize());
+window.addEventListener('resize', () => {
+  engine.resize();
+  if (state === 'map') layoutZoneMap();
+});
 
-// Dev shortcuts for testing: ?play=<zoneId> skips the menus, ?fast=<seconds> shortens the timer.
+// Dev shortcuts for testing: ?play=<zoneId or planet id> skips the menus, ?fast=<seconds> shortens the timer,
+// ?view=system|map opens a menu screen directly.
 const play = params.get('play');
-if (play && PLANETS.some((p) => p.zones.some((z) => z.id === play))) {
-  ui.show('map');
-  void startMission(play, false);
+const playZone = play ? (zoneById(play)?.id ?? (ZONE_MAPS[play as PlanetId] ? ZONE_MAPS[play as PlanetId].zones.find((z) => isAttackable(save, z.id))?.id : undefined)) : undefined;
+if (playZone) {
+  void startMission(playZone, false);
+} else if (params.get('view') === 'system') {
+  goSystem();
+} else if (params.get('view') === 'map') {
+  void openPlanet((params.get('planet') as PlanetId) ?? 'megacity', false);
 } else {
   ui.show('title');
 }

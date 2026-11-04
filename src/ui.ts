@@ -1,7 +1,8 @@
 // HTML overlay for menus and HUD (SPEC §6.2: HTML/CSS for menus, Babylon only for the 3D world).
-import { FACTIONS, FactionId, META, MetaId, PASSIVES, PLANETS, WEAPONS, missionDuration } from './game/data';
+import { FACTIONS, FactionId, META, MetaId, PASSIVES, PLANETS, PlanetId, WEAPONS, missionDuration } from './game/data';
+import { ZONE_MAPS, zoneById } from './game/zones';
 import { Choice, World } from './game/world';
-import { CreditBreakdown, SaveData, fmtTime, isAttackable, isCaptured, metaLevel } from './game/save';
+import { CreditBreakdown, SaveData, fmtTime, holder, isAttackable, metaLevel } from './game/save';
 
 const $ = <T extends HTMLElement = HTMLElement>(root: ParentNode, sel: string) => root.querySelector(sel) as T;
 const rgb = (c: [number, number, number]) => `rgb(${c.map((v) => Math.round(v * 255)).join(',')})`;
@@ -18,8 +19,9 @@ const TARGETING_TEXT: Record<string, string> = {
 
 export interface UiHandlers {
   start(): void;
-  selectPlanet(id: string): void;
+  selectPlanet(id: PlanetId): void;
   selectZone(id: string): void;
+  backToSystem(): void;
   launch(): void;
   buy(id: MetaId): void;
   choose(i: number): void;
@@ -39,8 +41,9 @@ export class UI {
   private screens: Record<string, HTMLElement> = {};
   private announceTimer = 0;
   private announceQueue: string[] = [];
-  planet = 'megacity';
+  planet: PlanetId = 'megacity';
   zone: string | null = null;
+  private labels: Partial<Record<PlanetId, HTMLElement>> = {};
 
   constructor(h: UiHandlers) {
     this.root = document.getElementById('ui')!;
@@ -48,15 +51,19 @@ export class UI {
       <div class="screen" id="title">
         <div>
           <div class="logo">SPACE CONQUEST*</div>
-          <p>Command a huge Alliance battlecruiser. Its weapons aim and fire on their own: you steer, dodge and collect.
-             Pick a zone on a planet, descend to the surface and hold out until the timer runs out.</p>
+          <p>Command a colossal Alliance battlecruiser. Its weapons aim and fire on their own: you steer and pick upgrades.
+             Choose a planet, strike an enemy zone on the front line, descend to the surface and hold out until the timer runs out.</p>
           <button class="primary" data-a="start">Start</button>
           <p class="small">WASD or arrows: steer · hold left mouse: fly to cursor · Space: afterburner · Esc: pause<br>Prototype build. Names with * are placeholders.</p>
         </div>
       </div>
+      <div class="screen" id="system">
+        <div class="plabels"></div>
+        <div class="panel left"></div>
+      </div>
       <div class="screen" id="map">
         <div class="panel left"></div>
-        <div class="panel right"></div>
+        <div class="panel right hangar"></div>
         <div class="help panel">
           <b>Controls</b><br>WASD / arrows: steer · Hold left mouse: fly toward cursor · Space / Shift: afterburner<br>
           Esc / P: pause · Mouse wheel: zoom · F3: performance overlay · Touch: drag anywhere to steer
@@ -102,7 +109,7 @@ export class UI {
       <div class="loading"><div class="ltext">Loading…</div></div>
       <div class="fade"></div>
     `;
-    for (const id of ['title', 'map', 'hud', 'results']) this.screens[id] = $(this.root, '#' + id);
+    for (const id of ['title', 'system', 'map', 'hud', 'results']) this.screens[id] = $(this.root, '#' + id);
     this.root.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest('[data-a]') as HTMLElement | null;
       if (!el || (el as HTMLButtonElement).disabled) return;
@@ -110,7 +117,8 @@ export class UI {
       const v = el.dataset.v ?? '';
       switch (a) {
         case 'start': return h.start();
-        case 'planet': return h.selectPlanet(v);
+        case 'planet': return h.selectPlanet(v as PlanetId);
+        case 'system': return h.backToSystem();
         case 'zone': return h.selectZone(v);
         case 'launch': return h.launch();
         case 'buy': return h.buy(v as MetaId);
@@ -132,7 +140,7 @@ export class UI {
     });
   }
 
-  show(id: 'title' | 'map' | 'hud' | 'results') {
+  show(id: 'title' | 'system' | 'map' | 'hud' | 'results') {
     for (const [k, el] of Object.entries(this.screens)) el.classList.toggle('on', k === id);
   }
 
@@ -154,36 +162,84 @@ export class UI {
     $(this.root, '.fade').classList.toggle('on', on);
   }
 
-  // ---------- planet map / hangar ----------
+  // ---------- solar system, zone map, hangar ----------
+  private legend(planet: (typeof PLANETS)[number]) {
+    return `<div class="legend">${(['alliance', ...planet.factions.map((f) => f.id)] as FactionId[])
+      .map((f) => `<span><i style="background:${rgb(FACTIONS[f].color)}"></i>${esc(FACTIONS[f].name)}</span>`)
+      .join('')}</div>`;
+  }
+
+  private planetCounts(save: SaveData, id: PlanetId) {
+    const zones = ZONE_MAPS[id].zones;
+    return {
+      total: zones.length,
+      held: zones.filter((z) => holder(save, z.id) === 'alliance').length,
+      front: zones.filter((z) => isAttackable(save, z.id)).length,
+    };
+  }
+
+  renderSystem(save: SaveData) {
+    const cards = PLANETS.map((p) => {
+      const c = this.planetCounts(save, p.id);
+      return `<button class="zone" data-a="planet" data-v="${p.id}">
+        <div class="row"><b>${esc(p.name)}</b><span class="muted small">Tier ${p.baseTier}+</span></div>
+        <div class="muted small">${esc(p.blurb)}</div>
+        ${this.legend(p)}
+        <div class="bar"><i style="width:${(c.held / c.total) * 100}%"></i></div>
+        <div class="state"><span style="color:var(--accent)">Alliance holds ${c.held}/${c.total} zones</span> · <span style="color:var(--warn)">${c.front} on the front line</span></div>
+      </button>`;
+    }).join('');
+    $(this.root, '#system .left').innerHTML = `<h2>Sector*</h2>
+      <div class="muted small">Pick a planet to open its zone map. Click a planet in space or a card below.</div>${cards}
+      <div class="muted small" style="margin-top:8px">${Math.floor(save.credits)} ¢ · upgrades are in the hangar on each zone map.</div>`;
+    $(this.root, '#system .plabels').innerHTML = PLANETS.map((p) => `<button class="plabel" data-a="planet" data-v="${p.id}">${esc(p.name)}</button>`).join('');
+    this.labels = {};
+    for (const p of PLANETS) this.labels[p.id] = $(this.root, `#system .plabel[data-v="${p.id}"]`);
+  }
+
+  placeLabels(pos: (id: PlanetId) => { x: number; y: number } | null, hover: PlanetId | null) {
+    for (const [id, el] of Object.entries(this.labels) as [PlanetId, HTMLElement][]) {
+      const p = pos(id);
+      el.style.display = p ? '' : 'none';
+      if (p) el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -100%)`;
+      el.classList.toggle('hot', id === hover);
+    }
+  }
+
   renderMap(save: SaveData) {
     const planet = PLANETS.find((p) => p.id === this.planet)!;
-    const zones = planet.zones
-      .map((z) => {
-        const ctl = Math.min(100, save.control[z.id] ?? 0);
-        const cap = isCaptured(save, z.id), att = isAttackable(save, z.id);
-        const holder = FACTIONS[z.owner];
-        const state = cap
-          ? '<span style="color:var(--accent)">Alliance territory</span>'
-          : `<span style="color:${rgb(holder.color)}">${esc(holder.name)}</span> · ${att ? '<span style="color:var(--warn)">front line, attackable</span>' : '<span class="muted">behind enemy lines</span>'}`;
-        return `<button class="zone ${z.id === this.zone ? 'sel' : ''}" data-a="zone" data-v="${z.id}">
-          <div class="row"><b>${esc(z.name)}</b><span class="muted small">Tier ${z.tier} · ${missionDuration(z.tier) / 60} min</span></div>
+    const c = this.planetCounts(save, planet.id);
+    const sel = this.zone ? zoneById(this.zone) : undefined;
+    let detail = `<div class="muted small" style="margin-top:10px">Select a zone on the map. Zones with orange attack arrows border Alliance territory and can be attacked.</div>`;
+    if (sel) {
+      const h = holder(save, sel.id);
+      const att = isAttackable(save, sel.id);
+      const ctl = Math.min(100, save.control[sel.id] ?? 0);
+      const state = h === 'alliance'
+        ? '<span style="color:var(--accent)">Alliance territory</span>'
+        : `<span style="color:${rgb(FACTIONS[h].color)}">${esc(FACTIONS[h].name)}</span> · ${att ? '<span style="color:var(--warn)">front line, attackable</span>' : '<span class="muted">behind enemy lines</span>'}`;
+      detail = `<div class="zone sel" style="cursor:default">
+          <div class="row"><b>${esc(sel.name)}</b>${h === 'alliance' ? '' : `<span class="muted small">${sel.capital ? 'Fortress · ' : ''}Tier ${sel.tier} · ${missionDuration(sel.tier) / 60} min</span>`}</div>
           <div class="state">${state}</div>
-          <div class="bar"><i style="width:${ctl}%"></i></div><div class="muted small">Control ${ctl}%</div>
+          ${h === 'alliance' ? '' : `<div class="bar"><i style="width:${ctl}%"></i></div><div class="muted small">Control ${ctl}%</div>`}
+        </div>
+        <button class="primary launch" data-a="launch" ${att ? '' : 'disabled'}>
+          ${att ? `Descend to ${esc(sel.name)}` : h === 'alliance' ? 'Held by the Alliance' : 'Not on the front line yet'}
         </button>`;
-      })
-      .join('');
-    const sel = planet.zones.find((z) => z.id === this.zone);
-    const canLaunch = sel && isAttackable(save, sel.id);
+    }
     $(this.root, '#map .left').innerHTML = `
-      <div class="tabs">${PLANETS.map((p) => `<button data-a="planet" data-v="${p.id}" class="${p.id === this.planet ? 'sel' : ''}">${esc(p.name)}</button>`).join('')}</div>
-      <h2>${esc(planet.name)}</h2>
+      <button data-a="system" class="back">◂ Solar system</button>
+      <h2 style="margin-top:10px">${esc(planet.name)}</h2>
       <div class="muted small">${esc(planet.blurb)}</div>
-      <div class="legend">${(['alliance', ...planet.factions] as FactionId[]).map((f) => `<span><i style="background:${rgb(FACTIONS[f].color)}"></i>${esc(FACTIONS[f].name)}</span>`).join('')}</div>
-      ${zones}
-      <button class="primary launch" data-a="launch" ${canLaunch ? '' : 'disabled'}>
-        ${sel ? (canLaunch ? `Descend to ${esc(sel.name)}` : isCaptured(save, sel.id) ? 'Zone already captured' : 'Capture the neighbouring zone first') : 'Select a zone on the planet'}
-      </button>
-      <div class="muted small" style="margin-top:8px">A successful mission adds ${35}% Control (+10% for the flagship). At 100% the zone is captured and the front line moves on.</div>`;
+      ${this.legend(planet)}
+      <div class="bar"><i style="width:${(c.held / c.total) * 100}%"></i></div>
+      <div class="state small"><span style="color:var(--accent)">Alliance holds ${c.held}/${c.total} zones</span> · <span style="color:var(--warn)">${c.front} attackable</span></div>
+      ${detail}
+      <div class="muted small" style="margin-top:8px">A successful mission adds 35% Control (+10% for the flagship). At 100% the zone joins the Alliance and its neighbours become new targets.</div>`;
+    this.renderHangar(save);
+  }
+
+  private renderHangar(save: SaveData) {
     const ups = (Object.keys(META) as MetaId[])
       .map((id) => {
         const d = META[id];
@@ -195,12 +251,17 @@ export class UI {
           <button data-a="buy" data-v="${id}" ${max || save.credits < cost ? 'disabled' : ''}>${max ? 'MAX' : cost + ' ¢'}</button></div>`;
       })
       .join('');
-    $(this.root, '#map .right').innerHTML = `
+    const html = `
       <div class="muted small">Credits</div><div class="credits">${Math.floor(save.credits)} ¢</div>
       <div class="muted small" style="margin:4px 0 8px">Runs ${save.stats.runs} · Wins ${save.stats.wins} · Kills ${save.stats.kills} · Best ${fmtTime(save.stats.bestTime)}</div>
       <h3>Permanent upgrades</h3>${ups}
       <details style="margin-top:10px"><summary class="muted small" style="pointer-events:auto;cursor:pointer">Settings</summary>${this.settingsHtml(save)}
         <button data-a="reset" style="margin-top:8px">Reset save</button></details>`;
+    this.root.querySelectorAll('.hangar').forEach((el) => {
+      const open = (el.querySelector('details') as HTMLDetailsElement | null)?.open;
+      el.innerHTML = html;
+      if (open) (el.querySelector('details') as HTMLDetailsElement).open = true;
+    });
   }
 
   private settingsHtml(save: SaveData) {
@@ -327,7 +388,7 @@ export class UI {
         <div class="small muted">Zone Control +${rewards.controlGain}% → ${opts.control}%${opts.captured ? ' · <b style="color:var(--accent)">ZONE CAPTURED!</b>' : ''}</div>
         <div class="bar"><i style="width:${opts.control}%"></i></div>
       </div>
-      <div class="btnrow" style="margin-top:16px"><button class="primary" data-a="back">Return to planet</button></div>`;
+      <div class="btnrow" style="margin-top:16px"><button class="primary" data-a="back">Return to zone map</button></div>`;
     this.show('results');
   }
 }

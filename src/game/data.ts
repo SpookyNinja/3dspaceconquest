@@ -170,7 +170,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   damage: { id: 'damage', name: 'Targeting Computer', desc: '+10% weapon damage', max: 5 },
   firerate: { id: 'firerate', name: 'Capacitor Banks', desc: '+8% fire rate', max: 5 },
   engine: { id: 'engine', name: 'Engine Overhaul', desc: '+8% speed and turn rate', max: 5 },
-  magnet: { id: 'magnet', name: 'Tractor Beam', desc: '+30% pickup range', max: 5 },
+  magnet: { id: 'magnet', name: 'Combat Analyzer', desc: '+15% XP from kills', max: 5 },
   regen: { id: 'regen', name: 'Nano-Repair', desc: '+0.8 hull per second', max: 5 },
 };
 
@@ -214,16 +214,16 @@ export const ENEMIES: Record<string, EnemyDef> = {
 };
 
 export const PLAYER_BASE = {
-  hull: 600,
-  speed: 58,
-  accel: 34,
-  turn: 0.85,
+  hull: 800,
+  speed: 42,
+  accel: 11,
+  turn: 0.32,
   magnet: 95,
   regen: 0.5,
-  scale: 4,
+  scale: 7,
   /** Collision circles along the hull (unscaled z offsets, radius in world units). */
   circles: [-6.5, -1, 4.5] as number[],
-  circleRadius: 13,
+  circleRadius: 22,
   boostMult: 1.9,
   boostTime: 2.5,
   boostCd: 12,
@@ -249,7 +249,7 @@ export const META: Record<MetaId, MetaDef> = {
   m_damage: { id: 'm_damage', name: 'Weapon Calibration', desc: '+5% weapon damage per level', max: 10, cost: costCurve(80, 1.45) },
   m_firerate: { id: 'm_firerate', name: 'Reactor Output', desc: '+4% fire rate per level', max: 8, cost: costCurve(90, 1.5) },
   m_engine: { id: 'm_engine', name: 'Thrusters', desc: '+5% speed per level', max: 6, cost: costCurve(70, 1.5) },
-  m_magnet: { id: 'm_magnet', name: 'Salvage Tractors', desc: '+12% pickup range per level', max: 6, cost: costCurve(50, 1.45) },
+  m_magnet: { id: 'm_magnet', name: 'Battle Records', desc: '+6% XP from kills per level', max: 6, cost: costCurve(50, 1.45) },
   m_salvage: { id: 'm_salvage', name: 'War Bonds', desc: '+8% credits from every mission', max: 8, cost: costCurve(100, 1.55) },
   m_reroll: { id: 'm_reroll', name: 'Tactical Officer', desc: '+1 level-up reroll per mission', max: 3, cost: costCurve(150, 2.2) },
 };
@@ -265,71 +265,72 @@ export const FACTIONS: Record<FactionId, { name: string; color: [number, number,
   void: { name: 'Void Cult*', color: [0.7, 0.3, 1] },
 };
 
-export interface ZoneDef {
-  id: string;
-  name: string;
-  tier: number;
-  /** Position on the planet globe in degrees (for the planet map). */
-  lat: number;
-  lon: number;
-  /** Faction holding the zone until the Alliance captures it. */
-  owner: FactionId;
-  /** Zone that must be captured first (front line). Null = border zone, attackable from the start. */
-  requires: string | null;
-}
-
-/** Territory that is drawn on the globe but not playable yet (more zones come with the conquest map, M2). */
-export interface RegionDef {
-  lat: number;
-  lon: number;
-  owner: FactionId;
-}
+export type PlanetId = 'megacity' | 'ocean';
 
 export interface PlanetDef {
-  id: 'megacity' | 'ocean';
+  id: PlanetId;
   name: string;
-  factions: FactionId[];
   blurb: string;
-  zones: ZoneDef[];
-  regions: RegionDef[];
+  /** Seed for the zone map, so every player gets the same map. */
+  seed: number;
+  /** Zone sites per row and column on the tactical map. */
+  grid: { cols: number; rows: number };
+  /** Tier of the zones right on the Alliance border; deeper zones get harder. */
+  baseTier: number;
+  /** Where the Alliance beachhead sits (map units, 1.4 x 1) and how many zones it holds at the start. */
+  alliance: { at: [number, number]; size: number };
+  /** Enemy factions: capital position on the map and how aggressively they grow when the map is made. */
+  factions: { id: FactionId; capital: [number, number]; weight: number }[];
+  names: string[];
+  /** Solar system screen: orbit radius, planet size and orbit speed. */
+  orbit: { radius: number; size: number; speed: number; phase: number };
 }
-
-const r = (lat: number, lon: number, owner: FactionId): RegionDef => ({ lat, lon, owner });
 
 export const PLANETS: PlanetDef[] = [
   {
     id: 'megacity',
     name: 'Megacity*',
-    factions: ['concord', 'void'],
     blurb: 'One endless metropolis. The Iron Concord and the Void Cult fight over the towers.',
-    zones: [
-      { id: 'mc_spire', name: 'Spire District', tier: 1, lat: 12, lon: -20, owner: 'concord', requires: null },
-      { id: 'mc_docks', name: 'Neon Docks', tier: 2, lat: -18, lon: 18, owner: 'concord', requires: 'mc_spire' },
-      { id: 'mc_core', name: 'Core Arcology', tier: 3, lat: 28, lon: 48, owner: 'void', requires: 'mc_docks' },
+    seed: 1207,
+    grid: { cols: 7, rows: 6 },
+    baseTier: 1,
+    alliance: { at: [0.12, 0.55], size: 4 },
+    factions: [
+      { id: 'concord', capital: [0.7, 0.25], weight: 1.2 },
+      { id: 'void', capital: [1.22, 0.75], weight: 1.5 },
     ],
-    regions: [
-      r(5, -52, 'alliance'), r(-28, -60, 'alliance'), r(38, -62, 'alliance'),
-      r(-42, -12, 'concord'), r(48, 2, 'concord'), r(-8, 72, 'concord'), r(-46, 42, 'concord'), r(20, -110, 'concord'), r(55, -150, 'concord'),
-      r(55, 85, 'void'), r(8, 108, 'void'), r(-32, 100, 'void'), r(30, 150, 'void'), r(-8, 172, 'void'), r(-52, 150, 'void'), r(-22, -140, 'void'),
-      r(-58, -95, 'concord'), r(70, -40, 'concord'), r(-70, 20, 'void'),
+    names: [
+      'Spire District', 'Neon Docks', 'Core Arcology', 'Old Foundry', 'Skybridge Row', 'Glass Canyon', 'Transit Hub', 'Lantern Ward',
+      'Iron Market', 'Sublevel Nine', 'Chrome Heights', 'Reactor Block', 'Harbor Stacks', 'The Undercity', 'Signal Tower', 'Pylon Fields',
+      'Ash Quarter', 'Copper Gardens', 'Data Vaults', 'Twin Spires', 'Grid Sector', 'Rust Belt', 'Highline', 'Sunken Plaza',
+      'Archive Hill', 'Foundry Gate', 'Neon Strip', 'Cathedral Ward', 'Mag-Rail Yards', 'Smog Basin', 'Black Terrace', 'Cobalt Row',
+      'Ember District', 'Silent Blocks', 'Dome Market', 'Vertigo Heights', 'Overpass', 'Kiln Ward', 'Echo Station', 'Prism Tower',
+      'Vapor Lanes', 'Steel Gardens', 'Beacon Ward', 'Last Light',
     ],
+    orbit: { radius: 200, size: 36, speed: 0.05, phase: 0.6 },
   },
   {
     id: 'ocean',
     name: 'Ocean*',
-    factions: ['swarm', 'concord', 'void'],
     blurb: 'Nothing but water, platforms and wrecks. Three factions contest the sea lanes.',
-    zones: [
-      { id: 'oc_shallows', name: 'Reef Platforms', tier: 2, lat: -8, lon: -25, owner: 'swarm', requires: 'mc_spire' },
-      { id: 'oc_storm', name: 'Storm Belt', tier: 3, lat: 22, lon: 10, owner: 'swarm', requires: 'oc_shallows' },
-      { id: 'oc_abyss', name: 'Abyssal Rig', tier: 4, lat: -26, lon: 42, owner: 'concord', requires: 'oc_storm' },
+    seed: 3301,
+    grid: { cols: 7, rows: 6 },
+    baseTier: 2,
+    alliance: { at: [0.1, 0.3], size: 3 },
+    factions: [
+      { id: 'swarm', capital: [0.66, 0.7], weight: 0.9 },
+      { id: 'concord', capital: [1.27, 0.2], weight: 1.2 },
+      { id: 'void', capital: [1.14, 0.85], weight: 1.5 },
     ],
-    regions: [
-      r(2, -62, 'alliance'), r(32, -55, 'alliance'),
-      r(-38, -22, 'swarm'), r(46, 32, 'swarm'), r(-6, 70, 'swarm'), r(-50, -110, 'swarm'), r(60, -20, 'swarm'),
-      r(-48, 62, 'concord'), r(20, 90, 'concord'), r(-20, 122, 'concord'), r(-70, 10, 'concord'),
-      r(42, 140, 'void'), r(-40, 170, 'void'), r(10, -150, 'void'), r(50, -100, 'void'), r(-15, -110, 'void'), r(72, 120, 'void'),
+    names: [
+      'Reef Platforms', 'Storm Belt', 'Abyssal Rig', 'Coral Shelf', 'Driftwood Atoll', 'Tidal Gate', 'Brine Fields', 'Wreck Cove',
+      'Kelp Expanse', 'Pearl Shoals', 'Gale Point', 'Deepwater Rig', 'Saltspray Lanes', 'Lighthouse Key', 'Maelstrom', 'Foam Reach',
+      'Sunken Fleet', 'Trench Line', 'Mirror Sea', 'Harpoon Bay', 'Siren Rocks', 'Thunder Shallows', 'Blue Hollow', 'Hydro Station',
+      'Breaker Reef', 'Ghost Buoys', 'Leviathan Deep', 'Spindrift', 'Undertow', 'Rain Wall', 'Coldwater Rig', 'Black Tide',
+      'Gull Islands', 'Pressure Point', 'Typhoon Eye', 'Riptide', 'Anchor Field', 'Glass Lagoon', 'Iceberg Lane', 'Far Shoals',
+      'Squall Line', 'Sonar Array', 'Tide Pools', 'Wavebreak',
     ],
+    orbit: { radius: 320, size: 44, speed: 0.032, phase: 3.4 },
   },
 ];
 

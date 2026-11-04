@@ -20,7 +20,8 @@ The old standalone asset viewer is still at `/asset-preview.html`.
 
 | Parameter | Effect |
 |---|---|
-| `?play=mc_spire` | Skip the menus and start that zone (`mc_spire`, `mc_docks`, `mc_core`, `oc_shallows`, `oc_storm`, `oc_abyss`) |
+| `?play=ocean` | Skip the menus and start a front-line zone of that planet (`megacity`, `ocean`), or a zone id such as `megacity-07` |
+| `?view=system` / `?view=map&planet=ocean` | Open the solar system or a planet's zone map directly |
 | `?fast=60` | Mission timer of 60 seconds instead of 8 to 15 minutes |
 | `?seed=123` | Fixed random seed (same seed and inputs give the same run) |
 
@@ -35,12 +36,14 @@ Space or Shift fires the afterburner · Esc or P pauses · mouse wheel zooms · 
 
 | Path | What |
 |---|---|
-| `src/game/data.ts` | All balance numbers: weapons, enemies, passives, permanent upgrades, factions, planets, zones |
+| `src/game/data.ts` | All balance numbers: weapons, enemies, passives, permanent upgrades, factions, planets |
+| `src/game/zones.ts` | Seeded Voronoi zone map per planet: zones, neighbours, starting owners, depth and tier |
 | `src/game/world.ts` | Mission simulation on a 2D plane, fixed 60 Hz, seeded RNG, no Babylon imports (unit-testable) |
 | `src/game/save.ts` | Versioned local save (`localStorage`), credits formula, zone Control and front-line rules |
 | `src/render/mission.ts` | Mission scene: ships, turrets, thin-instanced projectiles and pickups, effects, camera |
 | `src/render/surface.ts` | The planet surface under the battle: night megacity or open ocean |
-| `src/render/planetMap.ts` | Planet globe with faction territories and zone markers, dive animation on launch |
+| `src/render/system.ts` | 3D solar system: sun, orbiting planets, fly-to-planet transition |
+| `src/render/zoneMap.ts` | Flat tactical zone map (2D canvas): faction colours, borders, emblems, attack arrows, Control bars |
 | `src/ui.ts`, `src/style.css` | HTML overlay: title, planet map, upgrades, HUD, level-up cards, results |
 | `src/audio.ts`, `src/input.ts` | Web Audio mixer with voice limits; keyboard, mouse and touch input |
 

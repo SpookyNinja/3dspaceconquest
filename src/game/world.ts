@@ -17,8 +17,8 @@ import {
 } from './data';
 
 export const DT = 1 / 60;
-export const SPAWN_DIST = 560;
-const DESPAWN_DIST = 1150;
+export const SPAWN_DIST = 720;
+const DESPAWN_DIST = 1400;
 const MAX_ENEMIES = 150;
 const MAX_SHARDS = 260;
 
@@ -232,7 +232,12 @@ export class World {
     return (1 + 0.08 * this.passive('engine')) * (1 + 0.05 * this.meta.engine);
   }
   get magnetRange() {
-    return PLAYER_BASE.magnet * (1 + 0.3 * this.passive('magnet')) * (1 + 0.12 * this.meta.magnet);
+    return PLAYER_BASE.magnet;
+  }
+
+  /** Combat Analyzer passive and Battle Records upgrade (these reuse the old magnet ids so saves carry over). */
+  get xpMult() {
+    return (1 + 0.15 * this.passive('magnet')) * (1 + 0.06 * this.meta.magnet);
   }
   get armor() {
     return 1.5 * this.passive('armor') + 0.5 * this.meta.armor;
@@ -597,15 +602,10 @@ export class World {
     this.events.push({ type: 'explosion', x: e.x, z: e.z, size: e.radius / 3 });
     this.events.push({ type: 'sound', id: big ? 'low_frequency_explosion_000' : this.rng.chance(0.5) ? 'explosion_crunch_000' : 'explosion_crunch_002', vol: big ? 0.9 : 0.3 });
     if (big) this.events.push({ type: 'shake', amt: e.isBoss ? 3 : 1 });
-    // XP shards: big ships drop several so the pickup feels like a jackpot.
-    const shards = e.isBoss ? 16 : big ? 4 : 1;
-    for (let i = 0; i < shards; i++) {
-      const a = this.rng.range(0, Math.PI * 2), r = shards > 1 ? this.rng.range(5, e.radius * 1.5) : 0;
-      this.dropPickup('xp', e.x + Math.sin(a) * r, e.z + Math.cos(a) * r, e.def.xp / shards);
-    }
+    // XP goes straight to the ship on every kill, no pickups (Andre, 2026-11-04).
+    this.gainXp(e.def.xp * this.xpMult);
     if (e.isBoss) {
       this.dropPickup('repair', e.x, e.z, 0.35);
-      this.dropPickup('magnet', e.x + 15, e.z, 0);
     } else if (big ? this.rng.chance(0.25) : e.def.xp >= 5 ? this.rng.chance(0.05) : this.rng.chance(0.004)) {
       this.dropPickup('repair', e.x, e.z, 0.12);
     }
@@ -940,18 +940,22 @@ export class World {
     }
   }
 
+  private gainXp(amount: number) {
+    const p = this.player;
+    p.xp += amount;
+    while (p.xp >= p.xpNext) {
+      p.xp -= p.xpNext;
+      p.level++;
+      p.xpNext = xpForLevel(p.level);
+      this.pendingLevelUps++;
+      this.events.push({ type: 'levelup' });
+    }
+  }
+
   private collect(k: Pickup) {
     const p = this.player;
     if (k.kind === 'xp') {
-      p.xp += k.value;
-      while (p.xp >= p.xpNext) {
-        p.xp -= p.xpNext;
-        p.level++;
-        p.xpNext = xpForLevel(p.level);
-        this.pendingLevelUps++;
-        this.events.push({ type: 'levelup' });
-      }
-      if (this.rng.chance(0.15)) this.events.push({ type: 'sound', id: 'computer_noise_000', vol: 0.04 });
+      this.gainXp(k.value);
     } else if (k.kind === 'repair') {
       p.hull = Math.min(p.maxHull, p.hull + p.maxHull * k.value);
       this.events.push({ type: 'sound', id: 'door_open_000', vol: 0.5 });
