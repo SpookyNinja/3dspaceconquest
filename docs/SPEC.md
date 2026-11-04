@@ -1,6 +1,6 @@
 # Space Conquest* — Game Plan & Design Spec
 
-> Status: **Draft v0.2** (2026-11-04). Names marked with `*` are placeholders.
+> Status: **Draft v0.3** (2026-11-04). Names marked with `*` are placeholders.
 > Every open choice is tagged **[D#]** and collected in [§10 Decisions for Andre](#10-decisions-for-andre).
 > Each one has a recommendation, so we can start building on the defaults and change course later.
 >
@@ -9,6 +9,11 @@
 > - Factions **push back passively** using a hidden counter‑attack meter (§4.4).
 > - **Fewer but tougher enemies** that still feel like an armada (§3.5, §7.2).
 > - The game is **free to play**.
+>
+> **v0.3 decisions by Andre:**
+> - **Engine: Babylon.js**, chosen by Claude because Andre won't work in the engine directly (§6.1).
+> - **Mission length:** a regular timer that grows with zone difficulty, then optional **endless mode** (§3.1).
+> - **Weapons aim themselves.** Many weapon types with their own behaviour and targeting preferences (§3.4.1).
 
 ---
 
@@ -37,10 +42,10 @@ into enemy faction territory while the factions push back. *Later:* all online p
  │  Solar map → Planet → Tactical zone map          │
  │        │  pick an enemy zone bordering Alliance  │
  │        ▼                                         │
- │  ┌──── Mission loop (one run, ~10–15 min) ────┐  │
+ │  ┌──── Mission loop (8–20 min + endless) ─────┐  │
  │  │ fly · auto‑shoot · collect XP + resources  │  │
  │  │ level up → choose 1 of 3 upgrades          │  │
- │  │ survive waves → boss / extraction          │  │
+ │  │ survive timer → success → extract/endless  │  │
  │  └────────────────────────────────────────────┘  │
  │        │ result (win/lose, time, kills, loot)    │
  │        ▼                                         │
@@ -53,32 +58,44 @@ into enemy faction territory while the factions push back. *Later:* all online p
 ## 3. Missions (the run)
 
 ### 3.1 Structure
-- **Length:** a 12 minute target is the proposal **[D1]**. Vampire Survivors uses 30, but shorter suits
-  browser and mobile sessions and gives the zone map more frequent updates.
-- **Phases:** Approach (0:00–0:30, ship flies in, cinematic) → Waves (escalating, mini‑boss at 4:00 and 8:00)
-  → Boss or Extraction at 12:00.
-- **Win:** kill the boss, or survive until extraction. **Lose:** hull reaches 0. Both pay credits; a win pays more.
-- **"Progressed far enough"** for zone capture means reaching a **milestone** (for example 8:00 survived or boss killed).
-  See §4.3.
+- **Two phases (decided v0.3):**
+  1. **Regular mission timer.** Survive until the timer runs out and the mission counts as a **success** (this is what adds zone Control, §4.3).
+  2. **Endless mode (optional).** When the timer is reached, the player chooses **Extract** (bank rewards) or **Continue**. Enemy scaling
+     keeps climbing with no end; it pays bonus credits for every extra minute, and the run ends when the hull reaches 0.
+     A death in endless mode still counts as a success and keeps everything earned (the mission was already won).
+- **Timer length scales with difficulty.** Harder zones have a longer regular timer, so enemy scaling climbs higher before success.
+  Starting numbers to tune:
+
+  | Zone tier | Regular timer | Notes |
+  |---|---|---|
+  | 1 (border) | 8 min | Learning tier |
+  | 2 | 10 min | |
+  | 3 | 12 min | |
+  | 4 | 15 min | |
+  | 5+ (deep) | 18–20 min | Highest scaling before success |
+
+- **Waves:** escalating spawns with mini‑bosses at fixed points (e.g. every ~⅓ of the timer) and a boss at the end of the regular timer.
+  Killing the boss is not required for success, but pays a bonus.
+- **Lose:** hull reaches 0 before the timer. Still pays credits (less), and adds a little Control if the run got far.
 
 ### 3.2 Ships (selection in hangar)
 Gameplay happens on a flat 2D plane (XZ) and is rendered in 3D. Starting roster proposal (3 ships for MVP, more later):
 
 | Ship\* | Speed / turn | Hull | Identity |
 |---|---|---|---|
-| **Bulwark** (Dreadnought) | Very slow / sluggish | Very high | Heavy broadside batteries; the "tank" |
-| **Valkyrie** (Battlecruiser) | Medium / medium | Medium | Forward‑arc guns and missiles; the all‑rounder |
+| **Bulwark** (Dreadnought) | Very slow / sluggish | Very high | Heavy cannons and armor; the "tank" |
+| **Valkyrie** (Battlecruiser) | Medium / medium | Medium | Lasers and missiles; the all‑rounder |
 | **Hive** (Carrier) | Slow / slow | High | Launches drone wings that auto‑hunt; summoner |
 
-**Signature twist: weapon arcs.** Each ship has **hardpoints** (front, port, starboard, rear, turret). Weapons
-fire automatically, but only inside their arc, so *steering is aiming*. Showing one side of the ship through
-the tilted camera supports this directly. Turrets fire 360°. **[D2]**: arcs, or fully 360° auto‑aim like Vampire Survivors.
+**Weapons aim themselves (decided v0.3).** The player never aims. Steering is only for dodging, positioning and collecting
+resources. Each weapon system has its own firing behaviour and its own **targeting preference** (§3.4.1). Weapons are shown as
+turrets/launchers on the ship model, so the tilted camera shows them turning and firing.
 
 ### 3.3 Movement
 - Ships have **mass**: acceleration, max speed, turn rate and drift.
 - **WASD**: thrust in that direction relative to the screen; the ship rotates toward the movement vector at its turn rate.
 - **Mouse**: hold left click to fly toward the cursor (or click to set a waypoint).
-- **Gamepad**: left stick. **Touch**: floating virtual joystick (see §8.4).
+- **Gamepad**: left stick. **Touch**: floating virtual joystick (see §7.4).
 - An optional active ability on Space or Shift per ship (e.g. Bulwark "Brace shields", Valkyrie "Afterburn", Hive "Recall drones").
 
 ### 3.4 In‑run progression
@@ -92,7 +109,26 @@ the tilted camera supports this directly. Turrets fire 360°. **[D2]**: arcs, or
 These resource roles are a proposal **[D3]**. The point is that resources pull the player *away from safety*,
 which creates the "maneuver to gather" tension you described.
 
-- **Weapon pool (MVP ~8):** Flak cannon, Rail battery, Missile pod, Laser lance, Point‑defense, Mine layer, Drone bay, Ion arc.
+#### 3.4.1 Weapon systems
+Every weapon fires automatically. Weapons differ in **how** they deal damage and **what** they target.
+
+| Weapon\* | Behaviour | Targeting preference |
+|---|---|---|
+| **Pulse laser** | Fast travelling bolts | Nearest enemy |
+| **Arc zapper** | Electric bolt that chains between nearby enemies | Densest cluster |
+| **Rail battery** | Slow, piercing shot that goes through a line of enemies | Heaviest enemy (most HP) |
+| **Missile pod** | Homing missiles in salvos | Spread across different targets |
+| **Flak cannon** | Shells that burst into an area | Densest cluster |
+| **Beam lance** | Continuous beam that sweeps | Strongest enemy in range |
+| **Point defense** | Very short‑range rapid fire, also shoots down enemy missiles | Closest threat / projectiles |
+| **Drone bay** | Launches drones that hunt on their own | Drones pick targets |
+| **Mine layer** | Drops mines behind the ship | None (placed on the ship's path) |
+| **Shockwave emitter** | Periodic ring that pushes back and damages | All around the ship |
+
+Targeting modes as an engine feature: `nearest`, `cluster`, `heaviest`, `lowest_hp`, `spread`, `random`, `projectiles`.
+Upgrades can change a weapon's mode (for example "Rail battery: Hunter‑killer, now targets elites first").
+
+- **MVP pool:** about 8 of the above; the rest come later.
 - **Evolutions:** a max‑level weapon plus a specific passive evolves into a super‑weapon (proven Vampire Survivors hook).
 - **Passives:** hull, armor, fire rate, projectile speed, magnet range, cooldown, crit, engine power.
 
@@ -135,8 +171,8 @@ dominant enemy faction.
 
 ### 4.3 Capture rule (offline version) [D4]
 Each zone has **Control** from 0 to 100% for the Alliance.
-- A run in a zone that reaches the milestone adds Control (proposal: +35% for a win, +20% for reaching the milestone, less for an early loss).
-  So a zone takes about 3 good runs.
+- A successful run (regular timer reached) adds Control (proposal: +35%, +10% bonus for killing the boss). A loss adds a little Control
+  depending on how far into the timer it got (e.g. up to +10%). So a zone takes about 3 successful runs.
 - The zone flips when Control hits 100%. Neighbouring zones become attackable.
 - Control is the "how far the player has pushed into the zone" value that drives push‑back (§4.4).
 - *Later, online:* Control is shared by all players, with a per‑player daily cap and a threshold that scales with how many people are active, so the map neither stalls with few players nor finishes in an hour with many.
@@ -212,11 +248,16 @@ browser, works on mobile later, talks to a backend for accounts and shared map.
 | Visual editor | No (Inspector + Playground only) | No | **Yes** | **Yes** |
 | Cost/licence | Free, Apache‑2.0 | Free, MIT | Free, MIT | Free tier, Unity terms apply |
 
-**Recommendation: Babylon.js + TypeScript + Vite.**
+**Decision (v0.3): Babylon.js + TypeScript + Vite.** Andre doesn't want to work in the engine himself, so the choice is the one Claude can build, test and maintain best entirely in code.
 - It is web‑native, so it has the smallest download, fastest load and best mobile‑browser story, and it deploys to Pages and itch with zero tricks.
 - It is a real game engine (not just a renderer), with the things this game needs built in.
 - The backend SDKs are first‑class JavaScript, which matters because accounts and the shared map are core features.
 - Everything is code and data in the repo, so it's easy to review, diff, test and build together (including with Claude).
+
+**Does the engine decide the look?** Mostly no. In a web game the look comes from the 3D models, textures, lighting,
+post‑processing (bloom, glow, colour grading) and effects. Babylon.js supports physically based materials, bloom, glow layers,
+GPU particles and shadows, which covers both a stylized low‑poly look and a more realistic sci‑fi look. The art style (D13)
+matters far more than the engine.
 
 **Pick Godot 4 instead if** you personally want to lay out scenes, UI and levels in a visual editor and you're happy with GDScript
 and a heavier web build. **Three.js** is a fine alternative to Babylon if you prefer a lighter library and don't mind assembling
@@ -420,13 +461,13 @@ You can answer these one by one; the recommendation is what we'll assume until y
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| **D1** | Mission length | 8 / 12 / 15 / 30 min | **12 min** |
-| **D2** | Weapon aiming | Arcs per hardpoint (steering aims) / 360° auto‑aim | **Arcs** for broadside guns, turrets 360° |
+| **D1** | Mission length | Fixed / scales with difficulty | ✅ **Decided:** regular timer 8–20 min by tier, then optional endless mode (§3.1) |
+| **D2** | Weapon aiming | Arcs / full auto‑aim | ✅ **Decided:** full auto‑aim, each weapon has its own behaviour and targeting preference (§3.4.1) |
 | **D3** | Role of resources | As in §3.4 / resources also feed level‑ups / other | **§3.4 proposal** |
 | **D4** | Zone capture rule | Control % per zone (offline, §4.3) | ✅ **Decided:** Control %, passive push‑back meter (§4.4); exact numbers tuned in M2 |
 | **D5** | Seasons | Persistent map / resets / rotate solar systems | ⏸ **Later** (online only) |
 | **D6** | Real‑time co‑op in missions | No / later stretch goal | ⏸ **Later** |
-| **D7** | Engine | Babylon.js / Three.js / Godot 4 / Unity | **Babylon.js + TypeScript**; Godot if you want a visual editor |
+| **D7** | Engine | Babylon.js / Three.js / Godot 4 / Unity | ✅ **Decided: Babylon.js + TypeScript** (Claude builds it in code) |
 | **D8** | Hosting | GitHub Pages / itch.io / both | **Both** (Pages = dev, itch = public) |
 | **D9** | Backend | Supabase / Firebase / other | ⏸ **Later**; Supabase (EU) is the current favourite |
 | **D10** | Login | Guest first, link account later | ⏸ **Later**; no accounts in the first version |
