@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asset Preview</title>
+  <style>
+    :root { --bg: #05070d; --panel: rgba(12, 18, 32, 0.86); --text: #dfe8ff; --muted: #8b9bbd; --accent: #5aa9ff; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+    #ui { position: absolute; top: 12px; left: 12px; max-width: min(340px, calc(100vw - 24px)); background: var(--panel);
+          border: 1px solid #1f2b45; border-radius: 10px; padding: 12px 14px; box-sizing: border-box; }
+    #ui h1 { font-size: 15px; margin: 0 0 6px; }
+    #ui p { margin: 4px 0 10px; color: var(--muted); font-size: 12px; }
+    #ui label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 12px; }
+    #ui select, #ui button { width: 100%; background: #0d1526; color: var(--text); border: 1px solid #2a3a5c; border-radius: 6px;
+          padding: 6px 8px; font: inherit; }
+    #ui button { margin-top: 6px; cursor: pointer; }
+    #ui button:hover { border-color: var(--accent); }
+    #info { margin-top: 8px; font-size: 12px; color: var(--muted); white-space: pre-line; }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Space Conquest asset preview</h1>
+  <p>Drag to orbit, scroll to zoom. The fleet scene shows the scale contrast: the player battlecruiser vs. enemy fighters.</p>
+  <label for="view">View</label>
+  <select id="view"></select>
+  <button id="sfx">Play a random sound</button>
+  <button id="boom">Spawn explosion</button>
+  <div id="info"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/7.31.0/babylon.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@7.31.0/babylonjs.loaders.min.js"></script>
+<script>
+// Standalone preview (no build step): open via any static server, e.g. `npx vite` or `python3 -m http.server` in public/.
+const PLAYER_SCALE = 4; // Imperial hull is 18.5 units long -> ~74 units, vs ~8-12 unit fighters
+const A = 'assets/';
+const canvas = document.getElementById('c');
+const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true });
+const scene = new BABYLON.Scene(engine);
+scene.clearColor = new BABYLON.Color4(0.01, 0.015, 0.03, 1);
+
+const camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 3, 1.05, 260, BABYLON.Vector3.Zero(), scene);
+camera.attachControl(canvas, true);
+camera.lowerRadiusLimit = 5; camera.upperRadiusLimit = 6000; camera.wheelPrecision = 2; camera.minZ = 0.5; camera.maxZ = 40000;
+
+const sun = new BABYLON.DirectionalLight('sun', new BABYLON.Vector3(-1, -0.6, 0.5), scene);
+sun.intensity = 2.2;
+const fill = new BABYLON.HemisphericLight('fill', new BABYLON.Vector3(0, 1, 0), scene);
+fill.intensity = 0.35; fill.groundColor = new BABYLON.Color3(0.05, 0.07, 0.12);
+const glow = new BABYLON.GlowLayer('glow', scene); glow.intensity = 0.6;
+
+// Sky: equirectangular star map on a big inverted sphere.
+const sky = BABYLON.MeshBuilder.CreateSphere('sky', { diameter: 30000, segments: 32, sideOrientation: BABYLON.Mesh.BACKSIDE }, scene);
+const skyMat = new BABYLON.StandardMaterial('skyMat', scene);
+skyMat.emissiveTexture = new BABYLON.Texture(A + 'textures/sky/stars_milky_way_4k.jpg', scene);
+skyMat.disableLighting = true; skyMat.backFaceCulling = false; sky.material = skyMat; sky.infiniteDistance = true;
+sky.isPickable = false;
+
+function makePlanet(name, opts) {
+  const root = new BABYLON.TransformNode(name, scene);
+  const p = BABYLON.MeshBuilder.CreateSphere(name + 'Body', { diameter: opts.d, segments: 64 }, scene);
+  p.parent = root;
+  const m = new BABYLON.StandardMaterial(name + 'Mat', scene);
+  m.diffuseTexture = new BABYLON.Texture(A + opts.albedo, scene);
+  if (opts.emissive) { m.emissiveTexture = new BABYLON.Texture(A + opts.emissive, scene); m.emissiveTexture.level = 1.0; }
+  if (opts.specular) { m.specularTexture = new BABYLON.Texture(A + opts.specular, scene); m.specularPower = 48; }
+  else m.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+  p.material = m;
+  const c = BABYLON.MeshBuilder.CreateSphere(name + 'Clouds', { diameter: opts.d * 1.012, segments: 48 }, scene);
+  c.parent = root;
+  const cm = new BABYLON.StandardMaterial(name + 'CloudMat', scene);
+  cm.opacityTexture = new BABYLON.Texture(A + 'textures/planets/clouds_2k.jpg', scene);
+  cm.opacityTexture.getAlphaFromRGB = true;
+  cm.diffuseColor = new BABYLON.Color3(1, 1, 1); cm.specularColor = BABYLON.Color3.Black(); cm.alpha = opts.cloudAlpha;
+  c.material = cm;
+  // Thin atmosphere rim
+  const atm = BABYLON.MeshBuilder.CreateSphere(name + 'Atm', { diameter: opts.d * 1.05, segments: 48 }, scene);
+  atm.parent = root;
+  const am = new BABYLON.StandardMaterial(name + 'AtmMat', scene);
+  am.emissiveColor = opts.atmo; am.alpha = 0.12; am.disableLighting = true; am.backFaceCulling = true;
+  am.emissiveFresnelParameters = new BABYLON.FresnelParameters();
+  am.emissiveFresnelParameters.bias = 0.2; am.emissiveFresnelParameters.power = 3;
+  am.emissiveFresnelParameters.leftColor = BABYLON.Color3.White(); am.emissiveFresnelParameters.rightColor = BABYLON.Color3.Black();
+  atm.material = am;
+  scene.onBeforeRenderObservable.add(() => { p.rotation.y += 0.0004; c.rotation.y += 0.0006; });
+  [p, c, atm].forEach((mm) => (mm.isPickable = false));
+  return root;
+}
+
+const megacity = makePlanet('megacity', { d: 1600, albedo: 'textures/planets/megacity_albedo.jpg',
+  emissive: 'textures/planets/megacity_emissive.jpg', cloudAlpha: 0.15, atmo: new BABYLON.Color3(0.6, 0.7, 0.85) });
+const BACKDROP = { megacity: new BABYLON.Vector3(-2200, -1400, 4200), ocean: new BABYLON.Vector3(1900, -500, -2200) };
+const oceanP = makePlanet('ocean', { d: 1300, albedo: 'textures/planets/ocean_albedo.jpg',
+  specular: 'textures/planets/ocean_specular.jpg', cloudAlpha: 0.8, atmo: new BABYLON.Color3(0.4, 0.7, 1.0) });
+function backdropPlanets() { megacity.position.copyFrom(BACKDROP.megacity); oceanP.position.copyFrom(BACKDROP.ocean); }
+backdropPlanets();
+
+// --- particles
+function explosion(pos, scale = 1) {
+  const ps = new BABYLON.ParticleSystem('boom', 300, scene);
+  ps.particleTexture = new BABYLON.Texture(A + 'sprites/particles/spark_04.png', scene);
+  ps.emitter = pos.clone(); ps.minEmitBox = ps.maxEmitBox = BABYLON.Vector3.Zero();
+  ps.color1 = new BABYLON.Color4(1, 0.8, 0.4, 1); ps.color2 = new BABYLON.Color4(1, 0.4, 0.1, 1); ps.colorDead = new BABYLON.Color4(0.2, 0, 0, 0);
+  ps.minSize = 1.5 * scale; ps.maxSize = 5 * scale; ps.minLifeTime = 0.3; ps.maxLifeTime = 1.0;
+  ps.minEmitPower = 10 * scale; ps.maxEmitPower = 40 * scale; ps.createSphereEmitter(1);
+  ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD; ps.manualEmitCount = 250; ps.targetStopDuration = 1.2; ps.disposeOnStop = true;
+  ps.start();
+  const smoke = new BABYLON.ParticleSystem('smoke', 60, scene);
+  smoke.particleTexture = new BABYLON.Texture(A + 'sprites/particles/smoke_04.png', scene);
+  smoke.emitter = pos.clone(); smoke.createSphereEmitter(2 * scale);
+  smoke.color1 = new BABYLON.Color4(0.5, 0.45, 0.4, 0.6); smoke.color2 = new BABYLON.Color4(0.3, 0.3, 0.3, 0.5); smoke.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+  smoke.minSize = 6 * scale; smoke.maxSize = 14 * scale; smoke.minLifeTime = 1; smoke.maxLifeTime = 2.2; smoke.minEmitPower = 2; smoke.maxEmitPower = 8;
+  smoke.manualEmitCount = 40; smoke.targetStopDuration = 2.5; smoke.disposeOnStop = true; smoke.start();
+}
+
+function engineTrail(node, offset, size) {
+  const ps = new BABYLON.ParticleSystem('trail', 200, scene);
+  ps.particleTexture = new BABYLON.Texture(A + 'sprites/particles/flare_01.png', scene);
+  const e = new BABYLON.TransformNode('trailEmit', scene); e.parent = node; e.position = offset; ps.emitter = e;
+  ps.minEmitBox = ps.maxEmitBox = BABYLON.Vector3.Zero();
+  ps.color1 = new BABYLON.Color4(0.4, 0.7, 1, 1); ps.color2 = new BABYLON.Color4(0.2, 0.4, 1, 1); ps.colorDead = new BABYLON.Color4(0, 0, 0.2, 0);
+  ps.minSize = size * 0.6; ps.maxSize = size; ps.minLifeTime = 0.15; ps.maxLifeTime = 0.35; ps.emitRate = 120;
+  ps.direction1 = ps.direction2 = new BABYLON.Vector3(0, 0, 0); ps.minEmitPower = ps.maxEmitPower = 0;
+  ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD; ps.start();
+  return ps;
+}
+
+// --- sounds (unlocked on first click by Babylon's audio engine)
+let soundIds = [];
+function playRandomSound() {
+  if (!soundIds.length) return;
+  const id = soundIds[Math.floor(Math.random() * soundIds.length)];
+  const s = new BABYLON.Sound(id, A + 'audio/sfx/' + id + '.ogg', scene, () => s.play(), { volume: 0.6 });
+  info('Sound: ' + id);
+}
+
+const infoEl = document.getElementById('info');
+function info(t) { infoEl.textContent = t; }
+
+// --- models
+const containers = {};
+async function load(file) {
+  if (!containers[file]) containers[file] = await BABYLON.SceneLoader.LoadAssetContainerAsync(A, file, scene);
+  return containers[file];
+}
+let current = []; let trails = []; let animObs = null;
+function clear() {
+  current.forEach((n) => n.dispose(false, false)); current = [];
+  trails.forEach((t) => t.dispose()); trails = [];
+  if (animObs) { scene.onBeforeRenderObservable.remove(animObs); animObs = null; }
+}
+async function spawn(file, pos, scale = 1, rotY = 0) {
+  const c = await load(file);
+  const inst = c.instantiateModelsToScene((n) => n, false);
+  // Wrap the glTF __root__ (which carries the right-to-left-handed conversion) in a plain holder we can move freely.
+  const holder = new BABYLON.TransformNode('holder', scene);
+  inst.rootNodes.forEach((r) => (r.parent = holder));
+  holder.position.copyFrom(pos); holder.scaling.setAll(scale); holder.rotation.y = rotY;
+  current.push(holder);
+  return holder;
+}
+
+let manifest;
+async function showFleet() {
+  clear(); backdropPlanets();
+  const player = await spawn('models/ships/player_battlecruiser.glb', BABYLON.Vector3.Zero(), PLAYER_SCALE);
+  trails.push(engineTrail(player, new BABYLON.Vector3(0, 0, -9.6), 6));
+  const fighters = manifest.ships.filter((s) => s.role === 'fighter');
+  const heavies = manifest.ships.filter((s) => s.role === 'heavy');
+  const enemies = [];
+  for (let i = 0; i < 28; i++) {
+    const def = i % 7 === 6 ? heavies[i % heavies.length] : fighters[i % fighters.length];
+    const a = (i / 28) * Math.PI * 2; const r = 90 + (i % 3) * 22;
+    const pos = new BABYLON.Vector3(Math.cos(a) * r, (i % 5 - 2) * 5, Math.sin(a) * r);
+    const e = await spawn(def.file, pos, 1);
+    enemies.push({ node: e, a, r, speed: 0.15 + (i % 4) * 0.03 });
+  }
+  const t0 = performance.now();
+  animObs = scene.onBeforeRenderObservable.add(() => {
+    const t = (performance.now() - t0) / 1000;
+    player.rotation.z = Math.sin(t * 0.4) * 0.03;
+    for (const e of enemies) {
+      const a = e.a + t * e.speed;
+      e.node.position.x = Math.cos(a) * e.r; e.node.position.z = Math.sin(a) * e.r;
+      e.node.rotation.y = -a; // tangent to the circle; ship noses point along +Z after glTF import
+    }
+  });
+  camera.setTarget(BABYLON.Vector3.Zero()); camera.alpha = -Math.PI / 2 - 0.35; camera.beta = 0.6; camera.radius = 200; // ~56° pitch, slight yaw offset (SPEC §5.1)
+  info(`Player: Imperial hull x${PLAYER_SCALE} (~${(18.55 * PLAYER_SCALE).toFixed(0)} units long)\nEnemies: ${fighters.length} fighter types, ${heavies.length} heavier types (~5-13 units)`);
+}
+
+async function showSingle(def) {
+  clear(); backdropPlanets();
+  const isPlayer = def.role === 'player';
+  const n = await spawn(def.file, BABYLON.Vector3.Zero(), isPlayer ? PLAYER_SCALE : 1);
+  const s = def.size ? Math.max(...def.size) * (isPlayer ? PLAYER_SCALE : 1) : 3;
+  camera.setTarget(BABYLON.Vector3.Zero()); camera.radius = Math.max(8, s * 1.8);
+  animObs = scene.onBeforeRenderObservable.add(() => { n.rotation.y += 0.004; });
+  info(`${def.file}${def.role ? '\nrole: ' + def.role : ''}${def.size ? '\nsize: ' + def.size.join(' x ') + ' units (unscaled)' : ''}`);
+}
+
+async function showPlanets() {
+  clear();
+  megacity.position.set(-950, 0, 0); oceanP.position.set(900, 0, 0);
+  camera.setTarget(BABYLON.Vector3.Zero()); camera.alpha = -Math.PI / 2 - 0.5; camera.beta = 1.35; camera.radius = 3600;
+  info('Megacity planet (procedural albedo + city-light emissive)\nOcean planet (procedural albedo + water specular)\nClouds: Solar System Scope (CC BY 4.0)');
+}
+
+(async () => {
+  manifest = await (await fetch(A + 'manifest.json')).json();
+  soundIds = manifest.sounds.map((s) => s.id);
+  const sel = document.getElementById('view');
+  const opt = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+  opt('fleet', 'Fleet: battlecruiser vs. fighters'); opt('planets', 'Planets: megacity + ocean');
+  manifest.ships.forEach((s, i) => opt('ship:' + i, `Ship: ${s.id}`));
+  manifest.props.forEach((p, i) => opt('prop:' + i, `Prop: ${p.id}`));
+  sel.onchange = () => {
+    const v = sel.value;
+    if (v === 'fleet') return showFleet(); if (v === 'planets') return showPlanets();
+    const [k, i] = v.split(':'); return showSingle((k === 'ship' ? manifest.ships : manifest.props)[+i]);
+  };
+  document.getElementById('sfx').onclick = playRandomSound;
+  document.getElementById('boom').onclick = () => {
+    const p = new BABYLON.Vector3((Math.random() - 0.5) * 160, 0, (Math.random() - 0.5) * 160);
+    explosion(p, 2);
+  };
+  const hash = location.hash.slice(1); // #planets, #ship:3, #prop:0 open a view directly
+  if ([...sel.options].some((o) => o.value === hash)) { sel.value = hash; await sel.onchange(); } else await showFleet();
+  window.__ready = true;
+})();
+
+engine.runRenderLoop(() => scene.render());
+window.addEventListener('resize', () => engine.resize());
+</script>
+</body>
+</html>

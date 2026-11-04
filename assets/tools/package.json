@@ -1,0 +1,16 @@
+{
+  "name": "space-conquest-asset-tools",
+  "private": true,
+  "type": "module",
+  "description": "Offline asset pipeline: turns downloaded source packs into the optimized files in public/assets. See assets/ASSETS.md.",
+  "scripts": {
+    "build": "node build-assets.mjs"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.1",
+    "@gltf-transform/extensions": "^4.2.1",
+    "@gltf-transform/functions": "^4.2.1",
+    "obj2gltf": "^3.1.6",
+    "sharp": "^0.34.1"
+  }
+}
